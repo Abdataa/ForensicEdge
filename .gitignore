@@ -1,0 +1,27 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# AI weights
+ai_engine/models/weights/
+
+# Database
+database/forensic_edge.db
+
+# Storage
+storage/uploads/
+storage/reports/
+storage/logs/
+
+# Next.js
+frontend/node_modules/
+frontend/.next/
+
+# Env files
+.env
+backend/.env
+
+# OS
+.DS_Store
+Thumbs.db
