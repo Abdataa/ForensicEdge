@@ -5,6 +5,7 @@ __pycache__/
 
 # AI weights
 ai_engine/models/weights/
+ai_engine/datasets/raw/
 
 # Database
 database/forensic_edge.db
@@ -25,3 +26,6 @@ backend/.env
 # OS
 .DS_Store
 Thumbs.db
+
+##
+README.md
