@@ -1,6 +1,12 @@
 import cv2
 from pathlib import Path
 
+'''
+This script preprocesses the images in the processed dataset
+by resizing them to 224x224, enhancing contrast using histogram equalization,
+and normalizing pixel values to the range [0, 1].
+The preprocessed images are saved in a new directory structure under "processed_clean".
+'''
 INPUT_DIR = Path("ai_engine/datasets/processed")
 OUTPUT_DIR = Path("ai_engine/datasets/processed_clean")
 
