@@ -93,7 +93,9 @@ Under Active Development (Senior Project - ASTU)
 │   │
 │   ├── 📁 datasets/
 │   │   ├── 📁 raw/
-│   │   │   ├── fingerprints/
+│   │   │   ├── fingerprints/SOCOFing/
+│   │   │   │                         ├──Real/
+│   │   │   │                         └──Altered/
 │   │   │   └── toolmarks/
 │   │   │
 │   │   ├── 📁 processed/
@@ -191,4 +193,4 @@ Under Active Development (Senior Project - ASTU)
 │   ├── 📄 System_Architecture.png
 │   ├── 📁 UML_Diagrams/
 │   ├── 📄 Experiment_Results.pdf
-│   └── 📄 
+│   └── 📄
