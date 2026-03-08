@@ -17,6 +17,7 @@ The dataset generates pairs of images along with a binary label -
 
 
 class SiameseFingerprintDataset(Dataset):
+    '''Custom Dataset for Siamese Network Training on Fingerprint Images.'''
 
     def __init__(self, root_dir):
 
