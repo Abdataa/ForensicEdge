@@ -31,7 +31,11 @@ class SiameseFingerprintDataset(Dataset):
 
         for identity in self.identities:
 
-            images = list(identity.glob("*"))
+            #images = list(identity.glob("*"))
+            images = [p for p in identity.glob("*") if p.suffix.lower() in [".bmp",
+                                                                        ".png",
+                                                                        ".jpg",
+                                                                        ".jpeg"]]
 
             if len(images) > 1:
                 self.identity_images[identity.name] = images
@@ -42,17 +46,18 @@ class SiameseFingerprintDataset(Dataset):
 
         return 50000   # virtual dataset size
 
+
+
     def load_image(self, path):
 
-        img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
 
-        img = img / 255.0
+    img = img / 255.0
 
-        img = torch.tensor(img, dtype=torch.float32)
+    img = torch.from_numpy(img).float()
 
-        img = img.unsqueeze(0)  # channel dimension
-
-        return img
+    img = img.unsqueeze(0)  # (1, H, W)-> (Channels, Height, Width)
+    return img
 
     def __getitem__(self, idx):
 

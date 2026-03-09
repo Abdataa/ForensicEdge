@@ -1,6 +1,8 @@
 import os
 import shutil
 from collections import defaultdict
+'''
+'''
 
 RAW_PATH = "../datasets/raw/fingerprints/SOCOFing/Real"
 PROCESSED_PATH = "../datasets/processed/SOCOFing"

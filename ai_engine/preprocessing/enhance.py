@@ -1,29 +1,30 @@
 import cv2
 from pathlib import Path
 
-'''
-This script preprocesses the images in the processed dataset
-by resizing them to 224x224, enhancing contrast using histogram equalization,
-and normalizing pixel values to the range [0, 1].
-The preprocessed images are saved in a new directory structure under "processed_clean".
-'''
 INPUT_DIR = Path("ai_engine/datasets/processed")
 OUTPUT_DIR = Path("ai_engine/datasets/processed_clean")
 
 TARGET_SIZE = (224, 224)
 
+# CLAHE initialization
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
 
 def preprocess_image(img_path):
+
     img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
 
-    # Resize
+    if img is None:
+        return None
+
+    # 1. Resize
     img = cv2.resize(img, TARGET_SIZE)
 
-    # Enhance contrast
-    img = cv2.equalizeHist(img)
+    # 2. Denoise while preserving ridges
+    img = cv2.bilateralFilter(img, d=5, sigmaColor=75, sigmaSpace=75)
 
-    # Normalize
-    img = img / 255.0
+    # 3. Local contrast enhancement
+    img = clahe.apply(img)
 
     return img
 
@@ -33,20 +34,27 @@ def process_split(split):
     input_path = INPUT_DIR / split
     output_path = OUTPUT_DIR / split
 
-    for identity in input_path.iterdir():
+    if not input_path.exists():
+        print(f"Skipping {split}: folder not found")
+        return
 
-        identity_out = output_path / identity.name
-        identity_out.mkdir(parents=True, exist_ok=True)
+    for img_file in input_path.rglob("*"):
 
-        for img_file in identity.glob("*"):
+        if img_file.suffix.lower() not in [".bmp", ".png", ".jpg", ".jpeg"]:
+            continue
 
-            img = preprocess_image(img_file)
+        # preserve folder structure
+        relative_path = img_file.relative_to(input_path)
+        save_path = output_path / relative_path
 
-            save_path = identity_out / img_file.name
+        save_path.parent.mkdir(parents=True, exist_ok=True)
 
-            cv2.imwrite(str(save_path), (img * 255).astype("uint8"))
+        processed_img = preprocess_image(img_file)
 
-    print(f"{split} preprocessing done")
+        if processed_img is not None:
+            cv2.imwrite(str(save_path), processed_img)
+
+    print(f"Finished preprocessing {split}")
 
 
 if __name__ == "__main__":
@@ -54,4 +62,4 @@ if __name__ == "__main__":
     for split in ["train", "val", "test"]:
         process_split(split)
 
-    print("All preprocessing finished")
+    print("All forensic preprocessing finished")
