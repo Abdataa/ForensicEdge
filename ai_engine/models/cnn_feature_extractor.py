@@ -1,77 +1,53 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from cnn_feature_extractor import FingerprintCNN
 
-
-class SiameseNetwork(nn.Module):
-
+class FingerprintCNN(nn.Module):
     def __init__(self):
-        super(SiameseNetwork, self).__init__()
+        super(FingerprintCNN, self).__init__()
 
-        # Shared CNN Feature Extractor
-        self.cnn = FingerprintCNN()
+        # Layer 1: Captures basic edges
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
 
-    # Pass one image through CNN
-    def forward_once(self, x):
-        embedding = self.cnn(x)
-        embedding = F.normalize(embedding, p=2, dim=1)  # normalize embeddings
-        return embedding
+        # Layer 2: Captures ridge flows
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
 
-    # Forward pass
-    def forward(self, input1, input2):
+        # Layer 3: Captures minutiae patterns (Bifurcations, Endings)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
 
-        emb1 = self.forward_once(input1)
-        emb2 = self.forward_once(input2)
+        self.pool = nn.MaxPool2d(2, 2)
 
-        return emb1, emb2
+        # NEW: Global Average Pooling replaces the massive flattened layer
+        self.gap = nn.AdaptiveAvgPool2d((1, 1))
 
-    # Euclidean Distance (internal metric)
-    def euclidean_distance(self, emb1, emb2):
-        return F.pairwise_distance(emb1, emb2)
+        self.dropout = nn.Dropout(p=0.3)
 
-    # Cosine Similarity
-    def cosine_similarity(self, emb1, emb2):
-        return F.cosine_similarity(emb1, emb2)
+        # UPDATED: fc1 now receives 128 features (the channel count from conv3)
+        # instead of 100,352 features.
+        self.fc1 = nn.Linear(128, 512)
+        self.fc2 = nn.Linear(512, 128) # Final Forensic Embedding
 
-    # Convert similarity to percentage
-    def similarity_percentage(self, emb1, emb2):
+    def forward(self, x):
+        # Convolutional Block
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(F.relu(self.bn3(self.conv3(x))))
 
-        cos_sim = self.cosine_similarity(emb1, emb2)
+        # Global Average Pooling
+        x = self.gap(x)
 
-        # Convert [-1,1] → [0,100]
-        similarity = ((cos_sim + 1) / 2) * 100
+        # Flatten to (Batch Size, 128)
+        x = x.view(x.size(0), -1)
 
-        return similarity
+        # Fully Connected Block
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
 
-    # Match classification for investigators
-    def match_status(self, similarity):
+        # Normalize embedding to unit length for similarity matching
+        x = F.normalize(x, p=2, dim=1)
 
-        if similarity >= 85:
-            return "MATCH"
-
-        elif similarity >= 60:
-            return "POSSIBLE MATCH"
-
-        else:
-            return "NO MATCH"
-
-    # Full forensic analysis output
-    def analyze(self, input1, input2):
-
-        emb1, emb2 = self.forward(input1, input2)
-
-        euclidean = self.euclidean_distance(emb1, emb2)
-        cosine = self.cosine_similarity(emb1, emb2)
-        similarity = self.similarity_percentage(emb1, emb2)
-
-        status = self.match_status(similarity.item())
-
-        result = {
-            "similarity_percentage": similarity.item(),
-            "cosine_similarity": cosine.item(),
-            "euclidean_distance": euclidean.item(),
-            "match_status": status
-        }
-
-        return result
+        return x

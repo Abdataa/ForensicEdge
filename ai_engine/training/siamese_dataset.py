@@ -33,9 +33,9 @@ class SiameseFingerprintDataset(Dataset):
 
             #images = list(identity.glob("*"))
             images = [p for p in identity.glob("*") if p.suffix.lower() in [".bmp",
-                                                                        ".png",
-                                                                        ".jpg",
-                                                                        ".jpeg"]]
+                                                        ".png",".jpg",
+                                                        ".jpeg"]]
+
 
             if len(images) > 1:
                 self.identity_images[identity.name] = images

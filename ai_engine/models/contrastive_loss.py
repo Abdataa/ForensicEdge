@@ -1,7 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+'''
+Contrastive Loss implementation for Siamese Networks.
+The loss encourages the model to learn embeddings where similar pairs are close together,
+ and dissimilar pairs are far apart in the embedding space.
+'''
 
 class ContrastiveLoss(nn.Module):
 
@@ -21,4 +25,3 @@ class ContrastiveLoss(nn.Module):
         )
 
         return loss
-        
