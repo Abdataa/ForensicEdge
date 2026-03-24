@@ -1,11 +1,12 @@
 import os
 import shutil
 from collections import defaultdict
+from pathlib import Path
 '''
 '''
-
-RAW_PATH = "../datasets/raw/fingerprints/SOCOFing/Real"
-PROCESSED_PATH = "../datasets/processed/SOCOFing"
+BASE = Path(__file__).resolve().parent.parent
+RAW_PATH = Base/"datasets/raw/fingerprints/SOCOFing/Real"
+PROCESSED_PATH =Base/"datasets/processed/SOCOFing"
 
 os.makedirs(PROCESSED_PATH, exist_ok=True)
 

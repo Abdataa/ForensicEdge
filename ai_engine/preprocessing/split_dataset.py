@@ -37,7 +37,7 @@ VAL_DIR.mkdir(parents=True, exist_ok=True)
 TEST_DIR.mkdir(parents=True, exist_ok=True)
 
 identities = [d for d in SOURCE.iterdir() if d.is_dir()]
-
+random.seed(42)  # For reproducibility
 random.shuffle(identities)
 
 total = len(identities)
@@ -53,6 +53,8 @@ test_ids = identities[val_split:]
 def copy_identities(ids, dest):
     for identity in ids:
         dest_path = dest / identity.name
+        if dest_path.exists():
+            shutil.rmtree(dest_path)# remove existing folder if it exists to avoid errors
         shutil.copytree(identity, dest_path)
 
 

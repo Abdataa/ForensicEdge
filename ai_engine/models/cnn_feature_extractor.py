@@ -50,4 +50,4 @@ class FingerprintCNN(nn.Module):
         # Normalize embedding to unit length for similarity matching
         x = F.normalize(x, p=2, dim=1)
 
-        return x
+        return x 
