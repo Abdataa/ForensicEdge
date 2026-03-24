@@ -39,7 +39,7 @@ def augment_image(img):
 
 
 def augment_identity(identity_path):
-'''
+    '''
 For a given identity (folder), this function reads all images,
 applies augmentation, and saves both original
 and augmented images to the output directory.'''
@@ -79,4 +79,3 @@ def run_augmentation():
 
 if __name__ == "__main__":
     run_augmentation()
-    

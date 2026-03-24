@@ -1,20 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-'''
-This script defines the FingerprintCNN model, a convolutional neural network designed
-to extract forensic features from fingerprint images.
-The architecture consists of three convolutional layers that capture different -
-levels of fingerprint details (edges, ridge flows, minutiae patterns),
-followed by fully connected layers that produce a 128-dimensional embedding.
-The final embedding is normalized to unit length, making it suitable
-for similarity-based matching in a Siamese network setup.
-This model serves as the backbone for fingerprint recognition tasks in the ForensicEdge project.
-'''
 
 class FingerprintCNN(nn.Module):
-    '''
-    Convolutional Neural Network for Extracting Forensic Features from Fingerprint Images.'''
     def __init__(self):
         super(FingerprintCNN, self).__init__()
 
@@ -31,11 +19,15 @@ class FingerprintCNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(128)
 
         self.pool = nn.MaxPool2d(2, 2)
-        self.dropout = nn.Dropout(p=0.3) # Prevents memorizing specific people
 
-        # Assuming input is 224x224.
-        # After 3 pools, size is 28x28.
-        self.fc1 = nn.Linear(128 * 28 * 28, 512)
+        # NEW: Global Average Pooling replaces the massive flattened layer
+        self.gap = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.dropout = nn.Dropout(p=0.3)
+
+        # UPDATED: fc1 now receives 128 features (the channel count from conv3)
+        # instead of 100,352 features.
+        self.fc1 = nn.Linear(128, 512)
         self.fc2 = nn.Linear(512, 128) # Final Forensic Embedding
 
     def forward(self, x):
@@ -44,7 +36,10 @@ class FingerprintCNN(nn.Module):
         x = self.pool(F.relu(self.bn2(self.conv2(x))))
         x = self.pool(F.relu(self.bn3(self.conv3(x))))
 
-        # Flatten
+        # Global Average Pooling
+        x = self.gap(x)
+
+        # Flatten to (Batch Size, 128)
         x = x.view(x.size(0), -1)
 
         # Fully Connected Block
@@ -52,7 +47,7 @@ class FingerprintCNN(nn.Module):
         x = self.dropout(x)
         x = self.fc2(x)
 
-        # CRITICAL: Normalize embedding to unit length for similarity matching
+        # Normalize embedding to unit length for similarity matching
         x = F.normalize(x, p=2, dim=1)
 
-        return x
+        return x 
