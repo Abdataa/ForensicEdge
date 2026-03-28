@@ -40,6 +40,7 @@ transform = A.Compose([
     A.RandomBrightnessContrast(p=0.5),
     A.ElasticTransform(alpha=1, sigma=50, p=0.3), # simulates skin deformation
     A.RandomResizedCrop(                           # cropping — per project report
+        size=(224, 224),
         height=224, width=224,
         scale=(0.9, 1.0),
         p=0.4
