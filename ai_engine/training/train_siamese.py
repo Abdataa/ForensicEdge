@@ -22,7 +22,7 @@ Step 3 — Mount Google Drive (to save checkpoints permanently)
         from google.colab import drive
         drive.mount('/content/drive')
 
-    Then set CHECKPOINT_DIR below to a path inside your Drive, for example:
+    Then set CHECKPOINT_DIR below to your Drive path, for example:
         CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
 
 Step 4 — Upload your project to Colab
@@ -35,7 +35,7 @@ Step 4 — Upload your project to Colab
         %cd /content/ForensicEdge
 
 Step 5 — Install dependencies
-    !pip install -q torch torchvision opencv-python-headless albumentations
+    !pip install -q torch torchvision opencv-python-headless albumentations tqdm
 
 Step 6 — Run this script
     Either paste the entire file into a Colab cell, or run:
@@ -48,13 +48,27 @@ Step 7 — Resume from checkpoint after disconnection
 CHECKPOINT STRATEGY
 -------------------
 Two files are saved to CHECKPOINT_DIR:
-    best_model.pth      — saved whenever val loss improves (use for inference)
-    checkpoint_latest.pth — overwritten every CHECKPOINT_EVERY epochs
-                            (use to resume training after disconnection)
 
-checkpoint_latest.pth contains:
-    epoch, model_state_dict, optimizer_state_dict,
-    scheduler_state_dict, best_val_loss, train_losses, val_losses
+    best_model.pth
+        Saved whenever val loss improves.
+        Use this file for inference and your FastAPI backend.
+
+    checkpoint_latest.pth
+        Overwritten every CHECKPOINT_EVERY epochs.
+        Contains full training state (epoch, weights, optimizer, scheduler,
+        loss history) so training can resume exactly where it left off.
+
+TQDM PROGRESS BARS
+------------------
+Three nested bars are shown during training:
+
+    Epoch  1/20 ──────── [train=0.3421  val=0.2918  lr=1.00e-03  time=141.3s]
+      Train  100%|████████████| 1562/1562 [02:14  loss=0.3421]
+      Val    100%|████████████|  312/312  [00:27  loss=0.2918]
+
+tqdm.auto is used so the bars render as rich notebook widgets on Colab
+and as plain ASCII bars in a terminal — no code change needed between
+environments.
 """
 
 import time
@@ -64,58 +78,61 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Adjust import style depending on how you run this:
-#   - As a module from project root:  python -m ai_engine.training.train_siamese
-#   - As a script from project root:  python ai_engine/training/train_siamese.py
-# ---------------------------------------------------------------------------
+# tqdm.auto: rich notebook widget on Colab, plain ASCII bar in terminal
+# No code change needed when switching between environments
+from tqdm.auto import tqdm
+
 from ai_engine.datasets.siamese_dataset import SiameseFingerprintDataset
 from ai_engine.models.siamese_network    import SiameseNetwork
 from ai_engine.models.loss_functions     import ContrastiveLoss
 
 
 # ===========================================================================
-# CONFIG  — all hyperparameters in one place
+# CONFIG — all hyperparameters in one place
 # ===========================================================================
 
 # --- Data ---
-# Training uses augmented data (4x original size, realistic distortions)
-# Val/Test use processed_clean (no augmentation — clean evaluation signal)
+# Training uses augmented data (4× original size, realistic distortions).
+# Val / Test use processed_clean — no augmentation for a clean eval signal.
 TRAIN_DIR = Path("ai_engine/datasets/augmented/train")
 VAL_DIR   = Path("ai_engine/datasets/processed_clean/val")
 
 # --- Model ---
-EMBEDDING_DIM      = 256    # must match cnn_feature_extractor.py default
-MATCH_THRESHOLD    = 85.0   # tune via experiments/threshold_experiment.py
+EMBEDDING_DIM      = 256     # must match cnn_feature_extractor.py default
+MATCH_THRESHOLD    = 85.0    # tune via experiments/threshold_experiment.py
 POSSIBLE_THRESHOLD = 60.0
 
 # --- Loss ---
-# margin=1.0 is standard for L2-normalised embeddings (max distance = 2.0)
+# margin=1.0 is standard for L2-normalised embeddings (max Euclidean dist = 2.0)
 # margin=2.0 pushes negatives to maximum distance → extreme gradients early on
 MARGIN = 1.0
 
 # --- Training ---
-BATCH_SIZE    = 32
-EPOCHS        = 20     # increased from 10; scheduler handles LR decay
-LR            = 1e-3
-WEIGHT_DECAY  = 1e-4   # L2 regularisation on optimizer
-GRAD_CLIP     = 1.0    # max gradient norm — prevents gradient explosion
+BATCH_SIZE   = 32
+EPOCHS       = 20      # scheduler handles LR decay so more epochs are useful
+LR           = 1e-3
+WEIGHT_DECAY = 1e-4    # L2 regularisation on Adam
+GRAD_CLIP    = 1.0     # max gradient norm — prevents gradient explosion
 
 # --- DataLoader ---
-# num_workers > 0 enables prefetching so GPU stays fed between batches
-# Set to 0 if you hit "RuntimeError: DataLoader worker" on Windows locally
+# num_workers > 0 prefetches batches so the GPU stays fed between steps.
+# Set NUM_WORKERS = 0 if you hit "RuntimeError: DataLoader worker" locally.
 NUM_WORKERS = 2
-PIN_MEMORY  = True     # faster CPU→GPU transfer (only useful with GPU)
+PIN_MEMORY  = True     # faster CPU → GPU transfer (only effective with GPU)
 
 # --- Reproducibility ---
 SEED = 42
 
 # --- Checkpointing ---
-# On Colab: set this to a path inside Google Drive so files survive disconnection
-# Example: Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
+# !! IMPORTANT FOR COLAB !!
+# The /content/ filesystem is wiped on every disconnection.
+# Change CHECKPOINT_DIR to a path inside Google Drive so checkpoints survive.
+#
+#   CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
+#
 CHECKPOINT_DIR         = Path("ai_engine/models/weights")
-CHECKPOINT_EVERY       = 5      # save checkpoint every N epochs
-RESUME_FROM_CHECKPOINT = False  # set True to continue after a disconnection
+CHECKPOINT_EVERY       = 5      # save checkpoint_latest.pth every N epochs
+RESUME_FROM_CHECKPOINT = False  # set True to resume after a disconnection
 
 # --- Device ---
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -125,7 +142,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def set_seeds(seed: int) -> None:
     """Fix all random seeds for reproducible training runs."""
-    import random, numpy as np
+    import random
+    import numpy as np
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -133,18 +151,13 @@ def set_seeds(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+# ---------------------------------------------------------------------------
 def build_dataloaders():
     """Create train and validation DataLoaders."""
-    train_dataset = SiameseFingerprintDataset(
-        root_dir = TRAIN_DIR,
-        size     = 50_000,   # virtual epoch size
-    )
-    val_dataset = SiameseFingerprintDataset(
-        root_dir = VAL_DIR,
-        size     = 10_000,
-    )
+    train_dataset = SiameseFingerprintDataset(root_dir=TRAIN_DIR, size=50_000)
+    val_dataset   = SiameseFingerprintDataset(root_dir=VAL_DIR,   size=10_000)
 
-    # Seeded generator so DataLoader shuffle is reproducible
+    # Seeded generator makes DataLoader shuffle reproducible across runs
     g = torch.Generator()
     g.manual_seed(SEED)
 
@@ -166,8 +179,9 @@ def build_dataloaders():
     return train_loader, val_loader
 
 
+# ---------------------------------------------------------------------------
 def build_model():
-    """Instantiate model, loss, optimizer, and LR scheduler."""
+    """Instantiate model, loss function, optimizer, and LR scheduler."""
     model = SiameseNetwork(
         embedding_dim      = EMBEDDING_DIM,
         match_threshold    = MATCH_THRESHOLD,
@@ -179,10 +193,11 @@ def build_model():
     optimizer = optim.Adam(
         model.parameters(),
         lr           = LR,
-        weight_decay = WEIGHT_DECAY,   # L2 regularisation
+        weight_decay = WEIGHT_DECAY,
     )
 
-    # Halve LR when val loss stops improving for 3 consecutive epochs
+    # Halve LR when val loss stops improving for 3 consecutive epochs.
+    # verbose=True prints a message each time the LR is reduced.
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode     = "min",
@@ -194,20 +209,30 @@ def build_model():
     return model, criterion, optimizer, scheduler
 
 
+# ---------------------------------------------------------------------------
 def save_checkpoint(
-    epoch:       int,
-    model:       nn.Module,
-    optimizer:   optim.Optimizer,
+    epoch:         int,
+    model:         nn.Module,
+    optimizer:     optim.Optimizer,
     scheduler,
     best_val_loss: float,
     train_losses:  list,
     val_losses:    list,
-    filename:    str = "checkpoint_latest.pth",
+    filename:      str = "checkpoint_latest.pth",
 ) -> None:
     """
-    Save full training state so training can resume after a Colab disconnection.
-    Saves: epoch, model weights, optimizer state, scheduler state,
-           best val loss so far, and the full loss history.
+    Save full training state to disk so training can resume after a
+    Colab disconnection.
+
+    Saved fields
+    ------------
+    epoch                : last completed epoch (resume starts at epoch + 1)
+    model_state_dict     : model weights
+    optimizer_state_dict : optimizer state (momentum buffers, per-param lr)
+    scheduler_state_dict : scheduler state (patience counter, best loss seen)
+    best_val_loss        : best validation loss achieved so far
+    train_losses         : full list of per-epoch training losses
+    val_losses           : full list of per-epoch validation losses
     """
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     path = CHECKPOINT_DIR / filename
@@ -223,25 +248,28 @@ def save_checkpoint(
         },
         path,
     )
-    print(f"  Checkpoint saved → {path}")
+    # tqdm.write prints without breaking the progress bars
+    tqdm.write(f"    Checkpoint saved → {path}")
 
 
+# ---------------------------------------------------------------------------
 def load_checkpoint(model, optimizer, scheduler):
     """
-    Load training state from checkpoint_latest.pth to resume training.
+    Load checkpoint_latest.pth and restore full training state.
     Returns (start_epoch, best_val_loss, train_losses, val_losses).
+    Raises FileNotFoundError with a clear message if no checkpoint exists.
     """
     path = CHECKPOINT_DIR / "checkpoint_latest.pth"
     if not path.exists():
         raise FileNotFoundError(
-            f"No checkpoint found at {path}. "
+            f"No checkpoint found at {path}.\n"
             f"Set RESUME_FROM_CHECKPOINT = False to start fresh."
         )
     ckpt = torch.load(path, map_location=DEVICE)
     model.load_state_dict(ckpt["model_state_dict"])
     optimizer.load_state_dict(ckpt["optimizer_state_dict"])
     scheduler.load_state_dict(ckpt["scheduler_state_dict"])
-    print(f"Resumed from epoch {ckpt['epoch']} — {path}")
+    tqdm.write(f"Resumed from epoch {ckpt['epoch']} — loaded {path}")
     return (
         ckpt["epoch"],
         ckpt["best_val_loss"],
@@ -250,46 +278,96 @@ def load_checkpoint(model, optimizer, scheduler):
     )
 
 
+# ---------------------------------------------------------------------------
 def train_epoch(model, loader, criterion, optimizer) -> float:
-    """One full pass over the training set. Returns mean loss."""
+    """
+    One full training pass over the dataset.
+
+    Shows a tqdm batch bar:
+        Train  100%|████████████| 1562/1562 [02:14  loss=0.3421]
+
+    The loss shown is a running average over all batches in this epoch —
+    it falls as the epoch progresses if training is working correctly.
+
+    Returns mean loss over all batches.
+    """
     model.train()
-    total_loss = 0.0
+    total_loss   = 0.0
+    running_loss = 0.0
 
-    for img1, img2, label in loader:
-        img1  = img1.to(DEVICE, non_blocking=True)
-        img2  = img2.to(DEVICE, non_blocking=True)
-        label = label.to(DEVICE, non_blocking=True)
+    # leave=False: bar disappears after the epoch so the outer epoch bar
+    # remains visible and the terminal does not scroll endlessly
+    with tqdm(
+        loader,
+        desc          = "  Train",
+        leave         = False,
+        unit          = "batch",
+        dynamic_ncols = True,
+    ) as batch_bar:
 
-        optimizer.zero_grad()
+        for batch_idx, (img1, img2, label) in enumerate(batch_bar, start=1):
 
-        emb1, emb2 = model(img1, img2)
-        loss = criterion(emb1, emb2, label)
+            img1  = img1.to(DEVICE,  non_blocking=True)
+            img2  = img2.to(DEVICE,  non_blocking=True)
+            label = label.to(DEVICE, non_blocking=True)
 
-        loss.backward()
+            optimizer.zero_grad()
 
-        # Gradient clipping — prevents gradient explosion on hard pairs
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=GRAD_CLIP)
+            emb1, emb2 = model(img1, img2)
+            loss = criterion(emb1, emb2, label)
 
-        optimizer.step()
-        total_loss += loss.item()
+            loss.backward()
+
+            # Gradient clipping — prevents gradient explosion on hard pairs
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=GRAD_CLIP)
+
+            optimizer.step()
+
+            total_loss   += loss.item()
+            running_loss  = total_loss / batch_idx
+
+            # Live running average loss on the right of the bar
+            batch_bar.set_postfix(loss=f"{running_loss:.4f}")
 
     return total_loss / len(loader)
 
 
+# ---------------------------------------------------------------------------
 def validate(model, loader, criterion) -> float:
-    """One full pass over the validation set. Returns mean loss."""
+    """
+    One full validation pass.
+
+    Shows a tqdm batch bar:
+        Val    100%|████████████|  312/312  [00:27  loss=0.2918]
+
+    Returns mean loss over all batches.
+    """
     model.eval()
-    total_loss = 0.0
+    total_loss   = 0.0
+    running_loss = 0.0
 
     with torch.no_grad():
-        for img1, img2, label in loader:
-            img1  = img1.to(DEVICE, non_blocking=True)
-            img2  = img2.to(DEVICE, non_blocking=True)
-            label = label.to(DEVICE, non_blocking=True)
+        with tqdm(
+            loader,
+            desc          = "  Val  ",
+            leave         = False,
+            unit          = "batch",
+            dynamic_ncols = True,
+        ) as batch_bar:
 
-            emb1, emb2 = model(img1, img2)
-            loss = criterion(emb1, emb2, label)
-            total_loss += loss.item()
+            for batch_idx, (img1, img2, label) in enumerate(batch_bar, start=1):
+
+                img1  = img1.to(DEVICE,  non_blocking=True)
+                img2  = img2.to(DEVICE,  non_blocking=True)
+                label = label.to(DEVICE, non_blocking=True)
+
+                emb1, emb2 = model(img1, img2)
+                loss = criterion(emb1, emb2, label)
+
+                total_loss   += loss.item()
+                running_loss  = total_loss / batch_idx
+
+                batch_bar.set_postfix(loss=f"{running_loss:.4f}")
 
     return total_loss / len(loader)
 
@@ -300,13 +378,19 @@ def validate(model, loader, criterion) -> float:
 def main():
     set_seeds(SEED)
 
-    print(f"Device        : {DEVICE}")
-    print(f"Embedding dim : {EMBEDDING_DIM}")
-    print(f"Epochs        : {EPOCHS}")
-    print(f"Batch size    : {BATCH_SIZE}")
-    print(f"LR            : {LR}  (ReduceLROnPlateau patience=3, factor=0.5)")
-    print(f"Margin        : {MARGIN}")
-    print(f"Checkpoints   : {CHECKPOINT_DIR}")
+    print("=" * 62)
+    print("  ForensicEdge — Siamese Network Training")
+    print("=" * 62)
+    print(f"  Device         : {DEVICE}")
+    print(f"  Embedding dim  : {EMBEDDING_DIM}")
+    print(f"  Epochs         : {EPOCHS}")
+    print(f"  Batch size     : {BATCH_SIZE}")
+    print(f"  LR             : {LR}  (ReduceLROnPlateau patience=3 factor=0.5)")
+    print(f"  Margin         : {MARGIN}")
+    print(f"  Grad clip      : {GRAD_CLIP}")
+    print(f"  Checkpoint dir : {CHECKPOINT_DIR}")
+    print(f"  Save every     : {CHECKPOINT_EVERY} epochs")
+    print("=" * 62)
     print()
 
     train_loader, val_loader = build_dataloaders()
@@ -325,52 +409,73 @@ def main():
 
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # --- Epoch loop ---
-    for epoch in range(start_epoch, EPOCHS):
+    # --- Outer epoch progress bar ---
+    # leave=True: stays visible after all epochs so the full history is readable.
+    # tqdm.write() is used inside the loop so print statements don't break bars.
+    with tqdm(
+        range(start_epoch, EPOCHS),
+        desc          = "Epoch",
+        unit          = "epoch",
+        leave         = True,
+        dynamic_ncols = True,
+    ) as epoch_bar:
 
-        t0 = time.time()
+        for epoch in epoch_bar:
 
-        train_loss = train_epoch(model, train_loader, criterion, optimizer)
-        val_loss   = validate(model, val_loader, criterion)
+            t0 = time.time()
 
-        # Step LR scheduler — reduces LR when val loss plateaus
-        scheduler.step(val_loss)
+            train_loss = train_epoch(model, train_loader, criterion, optimizer)
+            val_loss   = validate(model, val_loader, criterion)
 
-        elapsed = time.time() - t0
-        current_lr = optimizer.param_groups[0]["lr"]
+            # Step scheduler after val loss is known for this epoch
+            scheduler.step(val_loss)
 
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
+            elapsed    = time.time() - t0
+            current_lr = optimizer.param_groups[0]["lr"]
 
-        print(
-            f"Epoch [{epoch+1:>2}/{EPOCHS}] | "
-            f"Train Loss: {train_loss:.4f} | "
-            f"Val Loss: {val_loss:.4f} | "
-            f"LR: {current_lr:.2e} | "
-            f"Time: {elapsed:.1f}s"
-        )
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
 
-        # Save best model (for inference)
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), CHECKPOINT_DIR / "best_model.pth")
-            print(f"  Best model saved (val loss: {best_val_loss:.4f})")
-
-        # Save resumable checkpoint every N epochs
-        if (epoch + 1) % CHECKPOINT_EVERY == 0:
-            save_checkpoint(
-                epoch       = epoch + 1,
-                model       = model,
-                optimizer   = optimizer,
-                scheduler   = scheduler,
-                best_val_loss  = best_val_loss,
-                train_losses   = train_losses,
-                val_losses     = val_losses,
+            # Update the outer epoch bar right side with final epoch metrics
+            epoch_bar.set_postfix(
+                train = f"{train_loss:.4f}",
+                val   = f"{val_loss:.4f}",
+                lr    = f"{current_lr:.2e}",
+                time  = f"{elapsed:.1f}s",
             )
 
+            # Save best model — used for inference and FastAPI backend
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                torch.save(
+                    model.state_dict(),
+                    CHECKPOINT_DIR / "best_model.pth",
+                )
+                # tqdm.write prints without breaking the progress bars
+                tqdm.write(
+                    f"  ✓ Best model saved  "
+                    f"epoch={epoch + 1}  val_loss={best_val_loss:.4f}"
+                )
+
+            # Save resumable checkpoint every CHECKPOINT_EVERY epochs
+            if (epoch + 1) % CHECKPOINT_EVERY == 0:
+                save_checkpoint(
+                    epoch          = epoch + 1,
+                    model          = model,
+                    optimizer      = optimizer,
+                    scheduler      = scheduler,
+                    best_val_loss  = best_val_loss,
+                    train_losses   = train_losses,
+                    val_losses     = val_losses,
+                )
+
+    # --- Final summary ---
     print()
-    print(f"Training complete. Best val loss: {best_val_loss:.4f}")
-    print(f"Best model saved to: {CHECKPOINT_DIR / 'best_model.pth'}")
+    print("=" * 62)
+    print("  Training complete")
+    print(f"  Best val loss  : {best_val_loss:.4f}")
+    print(f"  Best model     : {CHECKPOINT_DIR / 'best_model.pth'}")
+    print("=" * 62)
 
 
 if __name__ == "__main__":
