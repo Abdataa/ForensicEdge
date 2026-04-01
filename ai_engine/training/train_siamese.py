@@ -70,7 +70,9 @@ tqdm.auto is used so the bars render as rich notebook widgets on Colab
 and as plain ASCII bars in a terminal — no code change needed between
 environments.
 """
-
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import time
 import torch
 import torch.nn as nn
@@ -130,7 +132,7 @@ SEED = 42
 #
 #   CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
 #
-CHECKPOINT_DIR         = Path("ai_engine/models/weights")
+CHECKPOINT_DIR         = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
 CHECKPOINT_EVERY       = 5      # save checkpoint_latest.pth every N epochs
 RESUME_FROM_CHECKPOINT = False  # set True to resume after a disconnection
 
