@@ -11,7 +11,7 @@ HOW TO RUN ON GOOGLE COLAB VIA VSCODE
 Step 1 — Open Colab from VSCode
     In VSCode, open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P).
     Type: "Colab: Create New Notebook" or open an existing .ipynb file.
-    Sign in with your Google account when prompted.
+    Sign in with Google account when prompted.
 
 Step 2 — Change runtime to GPU
     In the Colab notebook toolbar: Runtime → Change runtime type → T4 GPU → Save.
@@ -22,12 +22,12 @@ Step 3 — Mount Google Drive (to save checkpoints permanently)
         from google.colab import drive
         drive.mount('/content/drive')
 
-    Then set CHECKPOINT_DIR below to your Drive path, for example:
+    Then set CHECKPOINT_DIR below to Drive path, for example:
         CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
 
-Step 4 — Upload your project to Colab
+Step 4 — Upload  project to Colab
     Option A (recommended): Clone from GitHub
-        !git clone https://github.com/YOUR_USERNAME/ForensicEdge.git
+        !git clone https://github.com/Abdataa/ForensicEdge.git
         %cd ForensicEdge
 
     Option B: Upload a zip via Drive
