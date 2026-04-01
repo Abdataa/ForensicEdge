@@ -67,3 +67,7 @@ print("Dataset split complete")
 print("Train:", len(train_ids))
 print("Val:", len(val_ids))
 print("Test:", len(test_ids))
+
+assert set(train_ids).isdisjoint(val_ids)
+assert set(train_ids).isdisjoint(test_ids)
+assert set(val_ids).isdisjoint(test_ids)
