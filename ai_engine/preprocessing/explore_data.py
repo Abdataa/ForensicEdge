@@ -28,3 +28,24 @@ if altered_error:
     print(f"  Error: {altered_error}")
 else:
     print(f"  {altered_count} files")
+
+
+
+
+from pathlib import Path
+
+BASE = Path("ai_engine/datasets/processed/SOCOFing")
+
+identities = [d for d in BASE.iterdir() if d.is_dir()]
+
+print("Total identity folders:", len(identities))
+
+all_counts = []
+
+for identity in identities:
+    num_files = len([f for f in identity.iterdir() if f.is_file()])
+    all_counts.append(num_files)
+
+print("\nMin images per identity:", min(all_counts))
+print("Max images per identity:", max(all_counts))
+print("Average images per identity:", sum(all_counts)/len(all_counts))
