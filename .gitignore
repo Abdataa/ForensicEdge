@@ -6,6 +6,8 @@ __pycache__/
 # AI weights
 ai_engine/models/weights/
 ai_engine/datasets/raw/
+ai_engine/datasets/processed/
+
 
 # Database
 database/forensic_edge.db

@@ -130,9 +130,9 @@ SEED = 42
 # The /content/ filesystem is wiped on every disconnection.
 # Change CHECKPOINT_DIR to a path inside Google Drive so checkpoints survive.
 #
-#   CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
+CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
 #
-CHECKPOINT_DIR         = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
+#CHECKPOINT_DIR         = Path("ai_engine/models/weights")
 CHECKPOINT_EVERY       = 5      # save checkpoint_latest.pth every N epochs
 RESUME_FROM_CHECKPOINT = False  # set True to resume after a disconnection
 
