@@ -12,7 +12,7 @@ load_dotenv()
 # PostgreSQL connection URL
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://forensic_user:secure_password_2026@localhost:5433/forensicedge"
+    "postgresql://forensic_user:secure_password_2026@localhost:5432/forensicedge"
 )
 
 # Engine configuration for PostgreSQL

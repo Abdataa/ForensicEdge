@@ -70,7 +70,7 @@ class User(Base):
     feedback = relationship(
     "Feedback",
     back_populates="user",
-    foreign_keys="Feedback.user_id"
+    foreign_keys="Feedback.id"
 )
     audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
     created_users = relationship("User", backref="creator", remote_side=[id])

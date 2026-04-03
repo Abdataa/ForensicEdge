@@ -4,6 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.database import engine, Base, test_connection
 from core.config import settings
 import logging
+from app.api import routes_cases, routes_upload, routes_feedback
+from models import user, forensic_image, dataset, feature_set, model_version, similarity_result, case, case_evidence, report, feedback
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,3 +56,7 @@ async def health_check():
         "database": "connected",
         "api": "operational"
     }
+
+app.include_router(routes_cases.router)
+app.include_router(routes_upload.router)
+app.include_router(routes_feedback.router)

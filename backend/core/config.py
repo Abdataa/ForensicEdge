@@ -7,7 +7,7 @@ load_dotenv()
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://forensic_user:secure_password_2026@localhost:5433/forensicedge")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://forensic_user:secure_password_2026@localhost:5432/forensicedge")
     DATABASE_POOL_SIZE: int = int(os.getenv("DATABASE_POOL_SIZE", "20"))
     DATABASE_MAX_OVERFLOW: int = int(os.getenv("DATABASE_MAX_OVERFLOW", "10"))
     

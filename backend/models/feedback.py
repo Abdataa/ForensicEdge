@@ -59,7 +59,7 @@ class Feedback(Base):
     
     # Indexes
     __table_args__ = (
-        Index('idx_feedback_similarity', 'similarity_result_id'),
+        Index('idx_feedback_similarity', 'id'),
         Index('idx_feedback_type', 'feedback_type'),
         Index('idx_feedback_priority', 'priority'),
         Index('idx_feedback_retraining', 'used_for_retraining'),
