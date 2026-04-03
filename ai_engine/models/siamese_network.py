@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from cnn_feature_extractor import FingerprintCNN
+from ai_engine.models.cnn_feature_extractor import FingerprintCNN
 
 
 # ---------------------------------------------------------------------------
