@@ -84,7 +84,7 @@ from pathlib import Path
 # No code change needed when switching between environments
 from tqdm.auto import tqdm
 
-from ai_engine.datasets.siamese_dataset import SiameseFingerprintDataset
+from ai_engine.training.siamese_dataset import SiameseFingerprintDataset
 from ai_engine.models.siamese_network    import SiameseNetwork
 from ai_engine.models.loss_functions     import ContrastiveLoss
 
@@ -130,9 +130,9 @@ SEED = 42
 # The /content/ filesystem is wiped on every disconnection.
 # Change CHECKPOINT_DIR to a path inside Google Drive so checkpoints survive.
 #
-#   CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
+CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
 #
-CHECKPOINT_DIR         = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
+#CHECKPOINT_DIR         = Path("ai_engine/models/weights")
 CHECKPOINT_EVERY       = 5      # save checkpoint_latest.pth every N epochs
 RESUME_FROM_CHECKPOINT = False  # set True to resume after a disconnection
 

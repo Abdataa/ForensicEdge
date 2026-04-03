@@ -1,51 +1,38 @@
-import os
-
-base_path = 'ai_engine/datasets/raw/fingerprints/SOCOFing'
-
-real_path = os.path.join(base_path, 'Real')
-altered_path = os.path.join(base_path, 'Altered')
-
-def count_files_in_directory(directory_path):
-    if not os.path.exists(directory_path):
-        return 0, f"Directory not found: {directory_path}"
-
-    file_count = 0
-    for root, dirs, files in os.walk(directory_path):
-        file_count += len(files)
-    return file_count, None
-
-real_count, real_error = count_files_in_directory(real_path)
-altered_count, altered_error = count_files_in_directory(altered_path)
-
-print(f"Number of files in '{real_path}':")
-if real_error:
-    print(f"  Error: {real_error}")
-else:
-    print(f"  {real_count} files")
-
-print(f"Number of files in '{altered_path}':")
-if altered_error:
-    print(f"  Error: {altered_error}")
-else:
-    print(f"  {altered_count} files")
-
-
-
-
 from pathlib import Path
 
-BASE = Path("ai_engine/datasets/processed/SOCOFing")
+BASE_PATH = Path("ai_engine/datasets/processed_clean")
 
-identities = [d for d in BASE.iterdir() if d.is_dir()]
+VALID_EXTS = {".bmp", ".png", ".jpg", ".jpeg"}
 
-print("Total identity folders:", len(identities))
+def count_files(split_path):
+    count = 0
 
-all_counts = []
+    for file in split_path.rglob("*"):
+        if file.is_file() and file.suffix.lower() in VALID_EXTS:
+            count += 1
 
-for identity in identities:
-    num_files = len([f for f in identity.iterdir() if f.is_file()])
-    all_counts.append(num_files)
+    return count
 
-print("\nMin images per identity:", min(all_counts))
-print("Max images per identity:", max(all_counts))
-print("Average images per identity:", sum(all_counts)/len(all_counts))
+
+def analyze_dataset(base_path):
+    total = 0
+
+    print("\n📊 LOCAL DATASET ANALYSIS")
+
+    for split in ["train", "val", "test"]:
+        split_path = base_path / split
+
+        if not split_path.exists():
+            print(f"❌ Missing: {split}")
+            continue
+
+        count = count_files(split_path)
+        total += count
+
+        print(f"{split.upper():<5} → {count} images")
+
+    print(f"\nTOTAL → {total} images")
+    print("-" * 30)
+
+
+analyze_dataset(BASE_PATH)
