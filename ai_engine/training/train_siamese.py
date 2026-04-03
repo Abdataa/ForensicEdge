@@ -84,7 +84,7 @@ from pathlib import Path
 # No code change needed when switching between environments
 from tqdm.auto import tqdm
 
-from ai_engine.datasets.siamese_dataset import SiameseFingerprintDataset
+from ai_engine.training.siamese_dataset import SiameseFingerprintDataset
 from ai_engine.models.siamese_network    import SiameseNetwork
 from ai_engine.models.loss_functions     import ContrastiveLoss
 
