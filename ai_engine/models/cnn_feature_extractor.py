@@ -7,6 +7,9 @@ import torch.nn.functional as F
 # FingerprintCNN
 # ---------------------------------------------------------------------------
 class FingerprintCNN(nn.Module):
+    def __init__():
+        pass
+    
     """
     Custom CNN feature extractor for forensic fingerprint and toolmark images.
 
