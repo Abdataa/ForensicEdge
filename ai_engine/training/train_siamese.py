@@ -205,7 +205,7 @@ def build_model():
         mode     = "min",
         factor   = 0.5,
         patience = 3,
-        verbose  = True,
+        #verbose  = True,
     )
 
     return model, criterion, optimizer, scheduler
@@ -331,6 +331,7 @@ def train_epoch(model, loader, criterion, optimizer) -> float:
             # Live running average loss on the right of the bar
             batch_bar.set_postfix(loss=f"{running_loss:.4f}")
 
+
     return total_loss / len(loader)
 
 
@@ -414,6 +415,7 @@ def main():
     # --- Outer epoch progress bar ---
     # leave=True: stays visible after all epochs so the full history is readable.
     # tqdm.write() is used inside the loop so print statements don't break bars.
+    last_lr = optimizer.param_groups[0]["lr"]
     with tqdm(
         range(start_epoch, EPOCHS),
         desc          = "Epoch",
@@ -431,6 +433,16 @@ def main():
 
             # Step scheduler after val loss is known for this epoch
             scheduler.step(val_loss)
+
+            current_lr = optimizer.param_groups[0]["lr"]
+
+            if current_lr != last_lr:
+                tqdm.write(
+                    f"  ↓ LR reduced: {last_lr:.2e} → {current_lr:.2e} "
+                    f"(val_loss={val_loss:.4f})"
+                )
+
+            last_lr = current_lr
 
             elapsed    = time.time() - t0
             current_lr = optimizer.param_groups[0]["lr"]
