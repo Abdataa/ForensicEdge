@@ -34,5 +34,7 @@ Thumbs.db
 README.md
 ## processed data
 ai_engine/datasets/
-
+##set)up files
+colab2.ipynb
+## Colab notebooks
 ai_engine/colab.ipynb
