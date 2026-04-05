@@ -134,7 +134,7 @@ CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
 #
 #CHECKPOINT_DIR         = Path("ai_engine/models/weights")
 CHECKPOINT_EVERY       = 5      # save checkpoint_latest.pth every N epochs
-RESUME_FROM_CHECKPOINT = False  # set True to resume after a disconnection
+RESUME_FROM_CHECKPOINT = True  # set True to resume after a disconnection
 
 # --- Device ---
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
