@@ -33,6 +33,8 @@ processing_status_enum = ENUM(ProcessingStatus, name="processing_status_enum", c
 class ForensicImage(Base):
     __tablename__ = "forensic_images"
     
+   
+    case_links = relationship("CaseEvidence", back_populates="image")
     # Primary Key
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     

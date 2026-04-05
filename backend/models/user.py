@@ -22,9 +22,12 @@ user_role_enum = ENUM(
 class User(Base):
     __tablename__ = "users"
     
+   
+    cases_assigned = relationship("Case", foreign_keys="[Case.assigned_to]", back_populates="assignee")
+    cases_created = relationship("Case", foreign_keys="[Case.created_by]", back_populates="creator")
     # Primary Key using UUID for better distribution
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    
+      
     # Basic Information
     full_name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, nullable=False, index=True)
@@ -67,11 +70,8 @@ class User(Base):
     feature_sets = relationship("FeatureSet", back_populates="user")
     similarity_results = relationship("SimilarityResult", back_populates="user")
     reports = relationship("Report", back_populates="user")
-    feedback = relationship(
-    "Feedback",
-    back_populates="user",
-    foreign_keys="Feedback.id"
-)
+   # Inside class User(Base):
+    feedback = relationship("Feedback", back_populates="user", foreign_keys="[Feedback.user_id]" )
     audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
     created_users = relationship("User", backref="creator", remote_side=[id])
     

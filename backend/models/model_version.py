@@ -35,4 +35,4 @@ class ModelVersion(Base):
     # Relationships
     training_dataset = relationship("Dataset", back_populates="model_versions")
     trainer = relationship("User")
-    feature_sets = relationship("FeatureSet", foreign_keys="FeatureSet.model_version")
+    feature_sets = relationship("FeatureSet", foreign_keys="[FeatureSet.model_version_id]")

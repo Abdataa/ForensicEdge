@@ -5,6 +5,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
 import uuid
+from models.model_version import ModelVersion
+from models.forensic_image import ForensicImage
 
 # If using pgvector extension
 try:
@@ -20,6 +22,7 @@ class FeatureSet(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
+    model_version_id = Column( UUID(as_uuid=True),  ForeignKey("model_versions.model_id"),)
     # Image reference
     image_id = Column(UUID(as_uuid=True), ForeignKey("forensic_images.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -73,6 +76,7 @@ class FeatureSet(Base):
     user = relationship("User", back_populates="feature_sets")
     model = relationship("AIModel", back_populates="feature_sets")
     similarity_results = relationship("SimilarityResult", back_populates="feature_set")
+    model_version = relationship("ModelVersion", back_populates="feature_sets")
     
     def __repr__(self):
         return f"<FeatureSet image:{self.image_id} features:{self.minutiae_count}>"

@@ -28,7 +28,9 @@ class Feedback(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     # References
+    user = relationship("User", back_populates="feedback")
     similarity_result_id = Column(UUID(as_uuid=True), ForeignKey("similarity_results.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
