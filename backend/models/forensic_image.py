@@ -8,22 +8,22 @@ import uuid
 import enum
 
 class ImageType(str, enum.Enum):
-    FINGERPRINT = "fingerprint"
-    TOOLMARK = "toolmark"
+    fingerprint = "fingerprint"
+    toolmark = "toolmark"
 
 class ImageQuality(str, enum.Enum):
-    EXCELLENT = "excellent"
-    GOOD = "good"
-    FAIR = "fair"
-    POOR = "poor"
+    excellent = "excellent"
+    good = "good"
+    fair = "fair"
+    poor = "poor"
 
 class ProcessingStatus(str, enum.Enum):
-    UPLOADED = "uploaded"
-    PROCESSING = "processing"
-    PREPROCESSED = "preprocessed"
-    FEATURES_EXTRACTED = "features_extracted"
-    ANALYZED = "analyzed"
-    FAILED = "failed"
+    uploaded = "uploaded"
+    processing = "processing"
+    preprocessed = "preprocessed"
+    features_extracted = "features_extracted"
+    analyzed = "analyzed"
+    failed = "failed"
 
 # PostgreSQL ENUMs
 image_type_enum = ENUM(ImageType, name="image_type_enum", create_type=True)
@@ -46,13 +46,13 @@ class ForensicImage(Base):
     
     # Image Metadata
     image_type = Column(image_type_enum, nullable=False)
-    quality = Column(image_quality_enum, default=ImageQuality.GOOD)
+    quality = Column(image_quality_enum, default=ImageQuality.good)
     width = Column(Integer)
     height = Column(Integer)
     dpi = Column(Integer)
     
     # Processing Status
-    status = Column(processing_status_enum, default=ProcessingStatus.UPLOADED)
+    status = Column(processing_status_enum, default=ProcessingStatus.uploaded)
     processing_time = Column(Float)  # in seconds
     
     # Relationships
@@ -87,6 +87,11 @@ class ForensicImage(Base):
         back_populates="image1",
         cascade="all, delete-orphan"
     )
+    case_links = relationship(
+    "CaseEvidence",
+    back_populates="image",
+    cascade="all, delete-orphan"
+)
     similarity_results_as_image2 = relationship(
         "SimilarityResult", 
         foreign_keys="SimilarityResult.image2_id",

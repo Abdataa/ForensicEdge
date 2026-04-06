@@ -3,14 +3,17 @@ from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Boolean, Tex
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+import sqlalchemy as sa
 from core.database import Base
 import uuid
 
 class ModelVersion(Base):
     __tablename__ = "model_versions"
-    
-    model_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    model_id = Column(UUID(as_uuid=True), ForeignKey("ai_models.id"), nullable=False)
+
     version = Column(String(20), unique=True, nullable=False)
+    
     accuracy = Column(Float)
     loss = Column(Float)
     created_on = Column(DateTime(timezone=True), server_default=func.now())
@@ -32,7 +35,15 @@ class ModelVersion(Base):
     is_active = Column(Boolean, default=False)
     deployed_at = Column(DateTime(timezone=True), nullable=True)
     
+    __table_args__ = (
+        sa.UniqueConstraint("model_id", "version", name="unique_model_version"),
+    )
+
     # Relationships
     training_dataset = relationship("Dataset", back_populates="model_versions")
     trainer = relationship("User")
-    feature_sets = relationship("FeatureSet", foreign_keys="FeatureSet.model_version")
+
+    feature_sets = relationship(
+        "FeatureSet",
+        back_populates="model_version"
+    ) 

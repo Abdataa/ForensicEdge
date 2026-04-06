@@ -72,7 +72,7 @@ def downgrade():
     op.drop_table('forensic_images')
     op.drop_table('user_sessions')
     op.drop_table('password_resets')
-    op.drop_table('ai_models')
+    op.drop_table('ai_models')  
     op.drop_table('datasets')
     op.drop_table('system_config')
     op.drop_table('system_health')

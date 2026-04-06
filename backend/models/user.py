@@ -8,9 +8,9 @@ import uuid
 import enum
 
 class UserRole(str, enum.Enum):
-    ANALYST = "analyst"
-    ADMIN = "admin"
-    AI_ENGINEER = "ai_engineer"
+    analyst = "analyst"
+    admin = "admin"
+    ai_engineer = "ai_engineer"
 
 # PostgreSQL ENUM type
 user_role_enum = ENUM(
@@ -29,7 +29,7 @@ class User(Base):
     full_name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, nullable=False, index=True)
     password_hash = Column(String(200), nullable=False)
-    role = Column(user_role_enum, nullable=False, default=UserRole.ANALYST)
+    role = Column(user_role_enum, nullable=False, default=UserRole.analyst)
     
     # Professional Information
     badge_number = Column(String(50), unique=True, nullable=True)
@@ -71,6 +71,18 @@ class User(Base):
     "Feedback",
     back_populates="user",
     foreign_keys="Feedback.user_id"
+)# Cases assigned to the user
+    cases_assigned = relationship(
+    "Case",
+    foreign_keys="Case.assigned_to",
+    back_populates="assignee"
+)
+
+# Cases created by the user
+    cases_created = relationship(
+    "Case",
+    foreign_keys="Case.created_by",
+    back_populates="creator"
 )
     audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
     created_users = relationship("User", backref="creator", remote_side=[id])

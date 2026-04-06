@@ -10,7 +10,18 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from core.database import Base
-from models import *  # Import all models
+from models.user import User, UserSession, PasswordReset
+from models.case_evidence import CaseEvidence
+from models.similarity_result import SimilarityResult
+from models.dataset import Dataset
+from models.case import Case
+from models.model_version import ModelVersion
+from models.feedback import Feedback 
+from models.audit_log import AuditLog
+from models.forensic_image import ForensicImage
+from models.feature_set import FeatureSet
+from models.preprocessed_image import PreprocessedImage
+from models.report import Report # Import all models
 from core.config import settings
 
 config = context.config

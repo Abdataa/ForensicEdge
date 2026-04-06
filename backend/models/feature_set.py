@@ -43,8 +43,12 @@ class FeatureSet(Base):
     edge_profile = Column(JSONB, default=dict)
     
     # Model information
-    model_version = Column(String(50), nullable=False)
-    model_id = Column(UUID(as_uuid=True), ForeignKey("ai_models.id"), nullable=True)
+    model_version_id = Column(
+    UUID(as_uuid=True),
+    ForeignKey("model_versions.id"),
+    nullable=True
+)
+    
     confidence_scores = Column(JSONB, default=dict)
     
     # Quality metrics
@@ -58,7 +62,7 @@ class FeatureSet(Base):
     # Indexes
     __table_args__ = (
         Index('idx_feature_set_image', 'image_id'),
-        Index('idx_feature_set_model', 'model_id'),
+        Index('idx_feature_set_model', 'model_version_id'),
         Index('idx_feature_set_quality', 'feature_quality_score'),
     )
     
@@ -71,7 +75,10 @@ class FeatureSet(Base):
     # Relationships
     image = relationship("ForensicImage", back_populates="feature_sets")
     user = relationship("User", back_populates="feature_sets")
-    model = relationship("AIModel", back_populates="feature_sets")
+    model_version = relationship(
+    "ModelVersion",
+    back_populates="feature_sets"
+)
     similarity_results = relationship("SimilarityResult", back_populates="feature_set")
     
     def __repr__(self):

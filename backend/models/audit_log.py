@@ -9,40 +9,40 @@ import enum
 
 class ActionType(str, enum.Enum):
     # Authentication
-    LOGIN_SUCCESS = "login_success"
-    LOGIN_FAILED = "login_failed"
-    LOGOUT = "logout"
-    PASSWORD_CHANGE = "password_change"
+    login_success = "login_success"
+    login_failed = "login_failed"
+    logout = "logout"
+    password_change = "password_change"
     
     # User Management
-    USER_CREATED = "user_created"
-    USER_UPDATED = "user_updated"
-    USER_DEACTIVATED = "user_deactivated"
-    USER_ACTIVATED = "user_activated"
-    ROLE_CHANGED = "role_changed"
+    user_created = "user_created"
+    user_updated = "user_updated"
+    user_deactivated = "user_deactivated"
+    user_activated = "user_activated"
+    role_changed = "role_changed"
     
     # Evidence
-    IMAGE_UPLOADED = "image_uploaded"
-    IMAGE_DELETED = "image_deleted"
-    IMAGE_PREPROCESSED = "image_preprocessed"
-    FEATURES_EXTRACTED = "features_extracted"
+    image_uploaded = "image_uploaded"
+    image_deleted = "image_deleted"
+    image_preprocessed = "image_preprocessed"
+    features_extracted = "features_extracted"
     
     # Analysis
-    SIMILARITY_COMPARED = "similarity_compared"
-    REPORT_GENERATED = "report_generated"
-    REPORT_DOWNLOADED = "report_downloaded"
-    FEEDBACK_SUBMITTED = "feedback_submitted"
+    similarity_compared = "similarity_compared"
+    report_generated = "report_generated"
+    report_downloaded = "report_downloaded"
+    feedback_submitted = "feedback_submitted"
     
     # AI Model
-    MODEL_TRAINING_STARTED = "model_training_started"
-    MODEL_TRAINING_COMPLETED = "model_training_completed"
-    MODEL_DEPLOYED = "model_deployed"
-    DATASET_UPLOADED = "dataset_uploaded"
+    model_training_started = "model_training_started"
+    model_training_completed = "model_training_completed"
+    model_deployed = "model_deployed"
+    dataset_uploaded = "dataset_uploaded"
     
     # System
-    SYSTEM_BACKUP = "system_backup"
-    SYSTEM_RESTORE = "system_restore"
-    SETTINGS_CHANGED = "settings_changed"
+    system_backup = "system_backup"
+    system_restore = "system_restore"
+    settings_changed = "settings_changed"
 
 action_type_enum = ENUM(ActionType, name="action_type_enum", create_type=True)
 

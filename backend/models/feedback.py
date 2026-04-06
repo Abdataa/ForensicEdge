@@ -8,16 +8,16 @@ import uuid
 import enum
 
 class FeedbackType(str, enum.Enum):
-    CORRECT_MATCH = "correct_match"
-    FALSE_POSITIVE = "false_positive"
-    FALSE_NEGATIVE = "false_negative"
-    POOR_QUALITY = "poor_quality"
-    OTHER = "other"
+    correct_match = "correct_match"
+    false_positive = "false_positive"
+    false_negative = "false_negative"
+    poor_quality = "poor_quality"
+    other = "other"
 
 class FeedbackPriority(str, enum.Enum):
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
+    high = "high"
+    medium = "medium"
+    low = "low"
 
 # PostgreSQL ENUMs
 feedback_type_enum = ENUM(FeedbackType, name="feedback_type_enum", create_type=True)
@@ -34,7 +34,7 @@ class Feedback(Base):
     
     # Feedback content
     feedback_type = Column(feedback_type_enum, nullable=False)
-    priority = Column(feedback_priority_enum, default=FeedbackPriority.MEDIUM)
+    priority = Column(feedback_priority_enum, default=FeedbackPriority.medium)
     comment = Column(Text, nullable=False)
     
     # AI prediction vs Analyst decision
@@ -70,54 +70,3 @@ class Feedback(Base):
     user = relationship("User", back_populates="feedback", foreign_keys=[user_id])
     resolver = relationship("User", foreign_keys=[resolved_by])
 
-class AIModel(Base):
-    __tablename__ = "ai_models"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
-    # Model identification
-    name = Column(String(100), nullable=False)
-    version = Column(String(20), nullable=False)
-    description = Column(Text, nullable=True)
-    
-    # Model files
-    model_path = Column(String(500), nullable=False)
-    model_config = Column(JSONB, default=dict)
-    model_weights_hash = Column(String(64), nullable=True)
-    
-    # Training information
-    trained_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    trained_on = Column(DateTime(timezone=True), server_default=func.now())
-    training_dataset_id = Column(UUID(as_uuid=True), ForeignKey("datasets.id"), nullable=True)
-    training_duration = Column(Float)  # in seconds
-    training_parameters = Column(JSONB, default=dict)
-    
-    # Performance metrics
-    accuracy = Column(Float)
-    precision = Column(Float)
-    recall = Column(Float)
-    f1_score = Column(Float)
-    false_match_rate = Column(Float)
-    false_non_match_rate = Column(Float)
-    metrics = Column(JSONB, default=dict)
-    
-    # Status
-    status = Column(String(20), default="training")  # training, trained, deployed, archived
-    is_active = Column(Boolean, default=False)
-    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    deployed_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Indexes
-    __table_args__ = (
-        Index('idx_ai_models_version', 'version'),
-        Index('idx_ai_models_active', 'is_active'),
-    )
-    
-    # Relationships
-    trainer = relationship("User", foreign_keys=[trained_by])
-    training_dataset = relationship("Dataset", back_populates="trained_models")
-    feature_sets = relationship("FeatureSet", back_populates="model")
-    similarity_results = relationship("SimilarityResult", back_populates="model")

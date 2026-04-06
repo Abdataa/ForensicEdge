@@ -8,10 +8,25 @@ from core.database import Base
 class CaseEvidence(Base):
     __tablename__ = "case_evidence"
     
-    case_id = Column(UUID(as_uuid=True), ForeignKey("cases.case_id", ondelete="CASCADE"), primary_key=True)
-    image_id = Column(UUID(as_uuid=True), ForeignKey("forensic_images.image_id", ondelete="CASCADE"), primary_key=True)
+    case_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("cases.case_id", ondelete="CASCADE"),
+        primary_key=True
+    )
+
+    image_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("forensic_images.id", ondelete="CASCADE"),
+        primary_key=True
+    )
+
     linked_at = Column(DateTime(timezone=True), server_default=func.now())
-    linked_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+
+    linked_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True
+    )
     
     # Relationships
     case = relationship("Case", back_populates="evidence_links")

@@ -8,16 +8,16 @@ import uuid
 import enum
 
 class MatchConfidence(str, enum.Enum):
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-    INCONCLUSIVE = "inconclusive"
+    high = "high"
+    medium = "medium"
+    low= "low"
+    inconclusive = "inconclusive"
 
 class MatchStatus(str, enum.Enum):
-    MATCH = "match"
-    NON_MATCH = "non_match"
-    INCONCLUSIVE = "inconclusive"
-    PENDING_REVIEW = "pending_review"
+    match= "match"
+    non_match = "non_match"
+    inconclusive = "inconclusive"
+    pending_review = "pending_review"
 
 # PostgreSQL ENUMs
 match_confidence_enum = ENUM(MatchConfidence, name="match_confidence_enum", create_type=True)
@@ -37,7 +37,7 @@ class SimilarityResult(Base):
     # Similarity scores
     similarity_score = Column(Float, nullable=False)  # 0-100
     confidence = Column(match_confidence_enum, nullable=False)
-    match_status = Column(match_status_enum, default=MatchStatus.PENDING_REVIEW)
+    match_status = Column(match_status_enum, default=MatchStatus.pending_review)
     
     # Detailed analysis (JSONB)
     matched_features = Column(JSONB, default=list)

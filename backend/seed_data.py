@@ -17,12 +17,14 @@ from sqlalchemy.orm import Session
 from core.database import SessionLocal
 from models.user import User
 from models.forensic_image import ForensicImage
+from models.forensic_image import ImageType
 from models.preprocessed_image import PreprocessedImage
 from models.feature_set import FeatureSet
 from models.feedback import Feedback
 from models.similarity_result import SimilarityResult
 from models.report import Report
 from models.audit_log import AuditLog
+from models.ai_model import AIModel
 from models.dataset import Dataset
 from models.model_version import ModelVersion
 from models.case import Case
@@ -211,7 +213,7 @@ def seed_database():
                 id=uuid.uuid4(),
                 name=data["name"],
                 description=data["description"],
-                file_path=f"/data/datasets/{data['name'].replace(' ', '_')}.zip",
+                dataset_path=f"/data/datasets/{data['name'].replace(' ', '_')}.zip",
                 dataset_type=data["dataset_type"],
                 source=data["source"],
                 file_count=data["file_count"],
@@ -221,7 +223,7 @@ def seed_database():
                 test_count=data["test_count"],
                 uploaded_by=ai_engineer.id,
                 is_public=True,
-                metadata={
+                dataset_metadata={
                     "format": "TIFF",
                     "resolution": "500 DPI",
                     "year": 2024
@@ -277,11 +279,39 @@ def seed_database():
                 "status": "training"
             }
         ]
+        print("\n🤖 3. Creating AI Models...")
+
+        ai_models = []
+
+        model_data = [
+        {"name": "ForensicEdge CNN", "version": "1.0.0"},
+        {"name": "ForensicEdge Siamese", "version": "2.0.0"},
+        {"name": "ForensicEdge v3", "version": "3.0.0-beta"}
+]
+        for data in model_data:
+         model = AIModel(
+          id=uuid.uuid4(),
+          name=data["name"],
+          version=data["version"],
+          description=f"{data['name']} base model",
+          model_path=f"/models/{data['name'].replace(' ', '_')}.pt",
+          trained_by=ai_engineer.id,
+          training_dataset_id=dataset_objects[0].id,
+          status="training"
+    )
+        db.add(model)
+        ai_models.append(model)
+
+        db.flush()  # VERY IMPORTANT to generate IDs
+        
+
+        for model in ai_models:
+         print(f"   ✓ Created AI Model: {model.name}")
         
         model_objects = []
         for i, data in enumerate(models):
             model = ModelVersion(
-                model_id=uuid.uuid4(),
+                model_id=ai_models[i % len(ai_models)].id,
                 name=data["name"],
                 version=data["version"],
                 accuracy=data["accuracy"],
@@ -292,8 +322,8 @@ def seed_database():
                 false_match_rate=data["false_match_rate"],
                 false_non_match_rate=data["false_non_match_rate"],
                 model_path=f"/models/{data['name'].replace(' ', '_')}_{data['version']}.pt",
-                training_dataset_id=dataset_objects[i % len(dataset_objects)].dataset_id,
-                trained_by=ai_engineer.user_id,
+                training_dataset_id = dataset_objects[i % len(dataset_objects)].id,
+                trained_by=ai_engineer.id,
                 training_duration=random.uniform(3600, 14400),
                 training_parameters={
                     "batch_size": 32,
@@ -324,10 +354,11 @@ def seed_database():
         for i in range(15):
             analyst = random.choice(analyst_users)
             img = ForensicImage(
-                image_id=uuid.uuid4(),
-                user_id=analyst.user_id,
-                image_type="fingerprint",
-                upload_date=datetime.now() - timedelta(days=random.randint(0, 30)),
+                id=uuid.uuid4(),
+                user_id=analyst.id,
+                image_type=ImageType.fingerprint.value,
+                filename=f"sample_fingerprint_{i+1}.png",
+                created_at=datetime.now() - timedelta(days=random.randint(0, 30)),
                 file_path=f"/uploads/fingerprints/sample_fingerprint_{i+1}.png",
                 original_filename=f"latent_print_{i+1}.png",
                 file_size=random.randint(500000, 2000000),
@@ -349,10 +380,11 @@ def seed_database():
         for i in range(10):
             analyst = random.choice(analyst_users)
             img = ForensicImage(
-                image_id=uuid.uuid4(),
-                user_id=analyst.user_id,
-                image_type="toolmark",
-                upload_date=datetime.now() - timedelta(days=random.randint(0, 30)),
+                id=uuid.uuid4(),
+                user_id=analyst.id,
+                filename=f"sample_toolmark_{i}.png",
+                image_type=ImageType.toolmark.value,
+                created_at=datetime.now() - timedelta(days=random.randint(0, 30)),
                 file_path=f"/uploads/toolmarks/sample_toolmark_{i+1}.png",
                 original_filename=f"toolmark_evidence_{i+1}.png",
                 file_size=random.randint(300000, 1500000),
@@ -379,15 +411,17 @@ def seed_database():
         
         preprocessed_images = []
         for img in forensic_images[:20]:
+            filename = f"{img.original_filename.split('.')[0]}_enhanced.png"
             preprocessed = PreprocessedImage(
-                preprocess_id=uuid.uuid4(),
-                image_id=img.image_id,
+                id=uuid.uuid4(),
+                original_image_id=img.id,
+                processed_filename=filename,
                 processed_path=f"/preprocessed/{img.original_filename.replace('.png', '_enhanced.png')}",
-                enhancement_type=["grayscale", "noise_reduction", "contrast_enhancement", "ridge_enhancement"],
+                enhancement_techniques=["grayscale", "noise_reduction", "contrast_enhancement", "ridge_enhancement"],
                 user_id=img.user_id,
                 quality_score=random.uniform(0.7, 0.98),
                 processing_time=random.uniform(0.5, 2.5),
-                created_at=img.upload_date + timedelta(seconds=random.randint(10, 60))
+                created_at=img.created_at + timedelta(seconds=random.randint(10, 60))
             )
             db.add(preprocessed)
             preprocessed_images.append(preprocessed)
@@ -420,11 +454,12 @@ def seed_database():
                 minutiae_count = len(features["striations"])
             
             feature_set = FeatureSet(
-                feature_id=uuid.uuid4(),
-                image_id=img.image_id,
+                id=uuid.uuid4(),
+                image_id=img.id,
+                user_id=img.user_id,
                 feature_vector=generate_sample_feature_vector(),
-                extraction_date=img.upload_date + timedelta(seconds=random.randint(30, 120)),
-                model_version=active_model.version,
+                extraction_time=random.uniform(0.2, 2.5),
+                model_version_id=active_model.id,
                 minutiae_points=features.get("minutiae", []),
                 minutiae_count=minutiae_count,
                 ridge_flow_pattern=features.get("ridge_flow", {}),
@@ -434,7 +469,7 @@ def seed_database():
                     "minutiae": random.uniform(0.8, 0.98)
                 },
                 feature_quality_score=random.uniform(0.75, 0.95),
-                user_id=img.user_id,
+                 
                 created_at=datetime.now()
             )
             db.add(feature_set)
@@ -451,7 +486,7 @@ def seed_database():
         similarity_results = []
         for i in range(30):
             img1 = random.choice(forensic_images)
-            img2 = random.choice([img for img in forensic_images if img.image_id != img1.image_id])
+            img2 = random.choice([img for img in forensic_images if img.id != img1.id])
             
             # Generate realistic similarity score
             if img1.image_type == img2.image_type:
@@ -473,9 +508,9 @@ def seed_database():
                 confidence = "low"
             
             result = SimilarityResult(
-                result_id=uuid.uuid4(),
-                image1_id=img1.image_id,
-                image2_id=img2.image_id,
+                id=uuid.uuid4(),
+                image1_id=img1.id,
+                image2_id=img2.id,
                 similarity_score=similarity * 100,
                 match_status=match_status,
                 confidence=confidence,
@@ -485,7 +520,7 @@ def seed_database():
                 ],
                 matched_feature_count=random.randint(5, 20),
                 model_version=active_model.version,
-                user_id=random.choice(analyst_users).user_id,
+                user_id=random.choice(analyst_users).id,
                 analyst_verified=random.random() > 0.7,
                 analyst_comment="Matches observed in ridge flow pattern" if random.random() > 0.8 else None,
                 case_id=f"CASE-{random.randint(100, 999)}",
@@ -528,8 +563,8 @@ def seed_database():
                 description=f"Investigation into {case_titles[i % len(case_titles)].lower()}",
                 status=random.choice(case_statuses),
                 priority=random.choice(case_priorities),
-                assigned_to=random.choice(analyst_users).user_id,
-                created_by=admin.user_id,
+                assigned_to=random.choice(analyst_users).id,
+                created_by=admin.id,
                 metadata={
                     "incident_date": (datetime.now() - timedelta(days=random.randint(1, 180))).isoformat(),
                     "location": f"Addis Ababa, Ethiopia",
@@ -556,9 +591,9 @@ def seed_database():
             for img in assigned_images:
                 link = CaseEvidence(
                     case_id=case.case_id,
-                    image_id=img.image_id,
+                    image_id=img.id,
                     linked_at=datetime.now() - timedelta(days=random.randint(0, 30)),
-                    linked_by=random.choice(analyst_users).user_id
+                    linked_by=random.choice(analyst_users).id
                 )
                 db.add(link)
             
@@ -575,12 +610,12 @@ def seed_database():
         for i, result in enumerate(similarity_results[:15]):
             analyst = random.choice(analyst_users)
             report = Report(
-                report_id=uuid.uuid4(),
-                generated_by=analyst.user_id,
-                similarity_result_id=result.result_id,
-                report_file_path=f"/reports/report_{result.result_id}.pdf",
+                id=uuid.uuid4(),
+                user_id=result.user_id,
+                similarity_result_id=result.id,
+                report_path=f"/reports/report_{result.id}.pdf",
                 report_filename=f"Forensic_Report_{datetime.now().strftime('%Y%m%d')}_{i+1}.pdf",
-                report_type="PDF",
+                report_format="PDF",
                 case_number=result.case_id,
                 report_summary={
                     "case_summary": f"Comparison of evidence items",
@@ -615,8 +650,8 @@ def seed_database():
             timestamp = datetime.now() - timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
             
             audit_log = AuditLog(
-                log_id=uuid.uuid4(),
-                user_id=user.user_id,
+                id=uuid.uuid4(),
+                user_id=user.id,
                 user_email=user.email,
                 user_role=user.role,
                 action=action,
@@ -641,11 +676,11 @@ def seed_database():
         
         for img in forensic_images[25:]:
             feature_set = FeatureSet(
-                feature_id=uuid.uuid4(),
-                image_id=img.image_id,
+                id=uuid.uuid4(),
+                image_id=img.id,
                 feature_vector=generate_sample_feature_vector(),
-                extraction_date=img.upload_date + timedelta(seconds=random.randint(30, 120)),
-                model_version=active_model.version,
+                extraction_time=random.uniform(0.2, 2.5),
+                model_version_id=active_model.id,
                 minutiae_points=generate_sample_minutiae() if img.image_type == "fingerprint" else [],
                 minutiae_count=random.randint(10, 25) if img.image_type == "fingerprint" else 0,
                 striations=generate_sample_striations() if img.image_type == "toolmark" else [],
