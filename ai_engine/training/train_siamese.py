@@ -133,7 +133,7 @@ SEED = 42
 CHECKPOINT_DIR = Path("/content/drive/MyDrive/ForensicEdge/checkpoints")
 #
 #CHECKPOINT_DIR         = Path("ai_engine/models/weights")
-CHECKPOINT_EVERY       = 5      # save checkpoint_latest.pth every N epochs
+CHECKPOINT_EVERY       = 1      # save checkpoint_latest.pth every N epochs
 RESUME_FROM_CHECKPOINT = True  # set True to resume after a disconnection
 
 # --- Device ---
