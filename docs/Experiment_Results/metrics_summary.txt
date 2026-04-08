@@ -1,0 +1,29 @@
+=======================================================
+  ForensicEdge — Evaluation Results
+=======================================================
+  Test pairs evaluated : 15,030
+  Decision threshold   : 85.0%
+  Weights              : ai_engine\models\weights\best_model.pth
+-------------------------------------------------------
+  Classification Metrics  (at threshold = 85.0%)
+-------------------------------------------------------
+  Accuracy   : 60.77%
+  Precision  : 56.12%
+  Recall     : 98.70%
+  F1 Score   : 71.55%
+-------------------------------------------------------
+  Forensic Metrics
+-------------------------------------------------------
+  FMR  (False Match Rate)     : 77.17%
+  FNMR (False Non-Match Rate) : 1.30%
+  AUC                         : 0.8201
+  EER  (Equal Error Rate)     : 25.88%
+  EER Threshold               : 95.5%
+-------------------------------------------------------
+  Confusion Matrix
+-------------------------------------------------------
+  TP (Correct Match)      : 7,417
+  TN (Correct Reject)     : 1,716
+  FP (False Match)        : 5,799
+  FN (False Non-Match)    : 98
+=======================================================
