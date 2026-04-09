@@ -1,62 +1,41 @@
-# backend/app/main.py
+"""
+backend/app/main.py
+---------------------
+FastAPI application entry point.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from core.database import engine, Base, test_connection
-from core.config import settings
-import logging
-from app.api import routes_cases, routes_upload, routes_feedback
-from models import user, forensic_image, dataset, feature_set, model_version, similarity_result, case, case_evidence, report, feedback
 
+from app.api import api_router
+from app.core.config import settings
+from app.db.database import engine
+from app.models import Base  # assuming you have a Base metadata
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="ForensicEdge API",
-    description="AI-Powered Forensic Analysis System",
-    version="1.0.0"
+    version="1.0.0",
+    description="AI-assisted forensic evidence analysis system",
 )
 
-# Configure CORS
+# CORS configuration for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info("🚀 Starting ForensicEdge API...")
-    
-    # Test database connection
-    if not test_connection():
-        logger.error("Failed to connect to database. Exiting...")
-        exit(1)
-    
-    # Create tables (for development only)
-    logger.info("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("✅ Tables created successfully!")
+# Include all API routes under /api/v1
+app.include_router(api_router)
 
-@app.get("/")
-async def root():
-    return {
-        "message": "Welcome to ForensicEdge API",
-        "version": "1.0.0",
-        "status": "operational",
-        "database": "connected"
-    }
+@app.on_event("startup")
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "database": "connected",
-        "api": "operational"
-    }
-
-app.include_router(routes_cases.router)
-app.include_router(routes_upload.router)
-app.include_router(routes_feedback.router)
+    return {"status": "healthy"}
