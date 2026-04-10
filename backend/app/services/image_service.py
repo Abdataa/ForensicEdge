@@ -396,3 +396,4 @@ async def delete_image(
         details     = {"image_id": image_id},
         ip_address  = ip_address,
     )
+    

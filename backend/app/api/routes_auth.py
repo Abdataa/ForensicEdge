@@ -1,88 +1,124 @@
 """
 backend/app/api/routes_auth.py
 --------------------------------
-Authentication endpoints – registration, login, token refresh.
+Authentication endpoints — register, login, token refresh.
 
-Depends on:
-    - app.services.auth_service (register, login, refresh_token)
-    - app.schemas.user_schema (UserCreate, LoginRequest, TokenResponse, etc.)
+Endpoints
+---------
+    POST /api/v1/auth/register   — create new user account
+    POST /api/v1/auth/login      — authenticate and receive tokens
+    POST /api/v1/auth/refresh    — exchange refresh token for new access token
+    GET  /api/v1/auth/me         — return current user profile
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
+from app.core.database      import get_db
+from app.core.dependencies  import CurrentUser
 from app.schemas.user_schema import (
     UserCreate,
-    UserResponse,
     LoginRequest,
-    TokenResponse,
     RefreshRequest,
+    TokenResponse,
     AccessTokenResponse,
+    UserResponse,
 )
-from app.services import auth_service
+from app.services             import auth_service
+from app.services.log_service import create_log
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+# ---------------------------------------------------------------------------
 @router.post(
     "/register",
-    response_model=UserResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Register a new user account",
+    response_model = UserResponse,
+    status_code    = status.HTTP_201_CREATED,
+    summary        = "Register a new user account",
 )
 async def register(
     payload: UserCreate,
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    db:      AsyncSession = Depends(get_db),
 ):
     """
-    Create a new forensic analyst or admin account.
+    Register a new forensic analyst, admin, or AI engineer account.
 
-    - **email**: must be unique
-    - **password**: minimum 8 characters, must include uppercase, lowercase, and digit
-    - **role**: defaults to 'analyst'
+    - **full_name**: display name (2–120 chars)
+    - **email**: must be unique in the system
+    - **password**: min 8 chars, must include uppercase, lowercase, digit
+    - **role**: analyst | admin | ai_engineer  (default: analyst)
     """
     user = await auth_service.register(payload, db)
-    return user
+
+    await create_log(
+        db          = db,
+        action_type = "user_registered",
+        user_id     = user.id,
+        details     = {"email": user.email, "role": user.role},
+        ip_address  = request.client.host if request.client else None,
+    )
+    return UserResponse.model_validate(user)
 
 
+# ---------------------------------------------------------------------------
 @router.post(
     "/login",
-    response_model=TokenResponse,
-    summary="Authenticate and receive access/refresh tokens",
+    response_model = TokenResponse,
+    summary        = "Login and receive JWT tokens",
 )
 async def login(
-    credentials: LoginRequest,
-    db: AsyncSession = Depends(get_db),
+    payload: LoginRequest,
+    request: Request,
+    db:      AsyncSession = Depends(get_db),
 ):
     """
     Authenticate with email and password.
 
     Returns:
-    - **access_token**: short-lived JWT for API authorization
-    - **refresh_token**: long-lived JWT for obtaining new access tokens
-    - **user**: profile of the authenticated user
+    - **access_token**: short-lived JWT (60 min) — send in Authorization header
+    - **refresh_token**: long-lived JWT (7 days) — use to get new access tokens
+    - **user**: authenticated user profile
     """
-    return await auth_service.login(
-        email=credentials.email,
-        password=credentials.password,
-        db=db,
+    token_response = await auth_service.login(
+        email    = payload.email,
+        password = payload.password,
+        db       = db,
     )
+    await create_log(
+        db          = db,
+        action_type = "user_login",
+        user_id     = token_response.user.id,
+        details     = {"email": payload.email},
+        ip_address  = request.client.host if request.client else None,
+    )
+    return token_response
 
 
+# ---------------------------------------------------------------------------
 @router.post(
     "/refresh",
-    response_model=AccessTokenResponse,
-    summary="Obtain a new access token using a refresh token",
+    response_model = AccessTokenResponse,
+    summary        = "Refresh access token",
 )
 async def refresh(
     payload: RefreshRequest,
-    db: AsyncSession = Depends(get_db),
+    db:      AsyncSession = Depends(get_db),
 ):
     """
     Exchange a valid refresh token for a new access token.
-
-    The refresh token must not be expired and must be of type 'refresh'.
-    The user account must still exist and be active.
+    The refresh token itself is unchanged.
     """
-    return await auth_service.refresh_token(payload.refresh_token, db)
+    return await auth_service.refresh_token(token=payload.refresh_token, db=db)
+
+
+# ---------------------------------------------------------------------------
+@router.get(
+    "/me",
+    response_model = UserResponse,
+    summary        = "Get current user profile",
+)
+async def get_me(current_user: CurrentUser):
+    """Return the profile of the currently authenticated user."""
+    return UserResponse.model_validate(current_user)
