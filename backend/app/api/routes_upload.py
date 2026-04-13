@@ -49,10 +49,11 @@ router = APIRouter(prefix="/images", tags=["Evidence Images"])
     summary        = "Upload a forensic evidence image",
 )
 async def upload_image(
+    current_user:  CurrentUser      ,
     request:       Request,
     file:          UploadFile       = File(..., description="Image file (.bmp/.png/.jpg/.jpeg)"),
     evidence_type: str              = Form(..., description="fingerprint | toolmark"),
-    current_user:  CurrentUser      = Depends(),
+
     db:            AsyncSession     = Depends(get_db),
 ):
     """
@@ -84,10 +85,11 @@ async def upload_image(
     summary        = "List uploaded images",
 )
 async def list_images(
+    current_user:  CurrentUser   ,
     evidence_type: Optional[str] = None,
     page:          int           = 1,
     limit:         int           = 20,
-    current_user:  CurrentUser   = Depends(),
+
     db:            AsyncSession  = Depends(get_db),
 ):
     """
@@ -114,7 +116,7 @@ async def list_images(
 )
 async def get_image(
     image_id:     int,
-    current_user: CurrentUser  = Depends(),
+    current_user: CurrentUser ,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -144,7 +146,7 @@ async def get_image(
 async def delete_image(
     image_id:     int,
     request:      Request,
-    current_user: CurrentUser  = Depends(),
+    current_user: CurrentUser  ,
     db:           AsyncSession = Depends(get_db),
 ):
     """

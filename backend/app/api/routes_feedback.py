@@ -42,7 +42,7 @@ router = APIRouter(prefix="/feedback", tags=["Feedback"])
 async def submit_feedback(
     payload:      FeedbackCreate,
     request:      Request,
-    current_user: CurrentUser  = Depends(),
+    current_user: CurrentUser ,
     db:           AsyncSession = Depends(get_db),
 ):
     """

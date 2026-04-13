@@ -209,7 +209,6 @@ async def _preprocess_and_embed(
         image.status = "preprocessing"
         await db.commit()
 
-        from ai_engine.inference.preprocess import preprocess_from_bytes
         # preprocess_from_bytes applies the same pipeline as enhance.py
         # and returns a (1, 1, 224, 224) float32 tensor
         _ = preprocess_from_bytes(file_bytes)
@@ -396,4 +395,3 @@ async def delete_image(
         details     = {"image_id": image_id},
         ip_address  = ip_address,
     )
-    

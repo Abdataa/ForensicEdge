@@ -43,7 +43,7 @@ router = APIRouter(prefix="/compare", tags=["Similarity Analysis"])
 async def compare_images(
     payload:      CompareRequest,
     request:      Request,
-    current_user: CurrentUser  = Depends(),
+    current_user: CurrentUser  ,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -77,10 +77,11 @@ async def compare_images(
     summary        = "List past comparison results",
 )
 async def list_results(
+    current_user:  CurrentUser   ,
     evidence_type: Optional[str] = None,
     page:          int           = 1,
     limit:         int           = 20,
-    current_user:  CurrentUser   = Depends(),
+
     db:            AsyncSession  = Depends(get_db),
 ):
     """
@@ -107,7 +108,7 @@ async def list_results(
 )
 async def get_result(
     result_id:    int,
-    current_user: CurrentUser  = Depends(),
+    current_user: CurrentUser  ,
     db:           AsyncSession = Depends(get_db),
 ):
     """

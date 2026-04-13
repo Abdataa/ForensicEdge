@@ -38,7 +38,7 @@ router = APIRouter(prefix="/reports", tags=["Forensic Reports"])
 async def generate_report(
     payload:      ReportCreate,
     request:      Request,
-    current_user: CurrentUser  = Depends(),
+    current_user: CurrentUser  ,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -69,9 +69,10 @@ async def generate_report(
     summary        = "List generated reports",
 )
 async def list_reports(
+    current_user: CurrentUser  ,
     page:         int          = 1,
     limit:        int          = 20,
-    current_user: CurrentUser  = Depends(),
+
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -93,8 +94,9 @@ async def list_reports(
     summary        = "Get report metadata",
 )
 async def get_report(
+    current_user: CurrentUser ,
     report_id:    int,
-    current_user: CurrentUser  = Depends(),
+
     db:           AsyncSession = Depends(get_db),
 ):
     """Retrieve metadata for a single report including the PDF path."""
@@ -113,7 +115,7 @@ async def get_report(
 async def download_report(
     report_id:    int,
     request:      Request,
-    current_user: CurrentUser  = Depends(),
+    current_user: CurrentUser ,
     db:           AsyncSession = Depends(get_db),
 ):
     """

@@ -34,10 +34,11 @@ router = APIRouter(prefix="/logs", tags=["Activity Logs"])
     summary = "Get your activity history",
 )
 async def get_my_logs(
+    current_user: CurrentUser  ,
     action_type:  Optional[str] = None,
     page:         int           = 1,
     limit:        int           = 50,
-    current_user: CurrentUser   = Depends(),
+    
     db:           AsyncSession  = Depends(get_db),
 ):
     """
