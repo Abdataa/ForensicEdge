@@ -33,7 +33,7 @@ Dependencies
 ------------
     pip install python-jose[cryptography] passlib[bcrypt]
 """
-
+import hashlib
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
@@ -96,7 +96,15 @@ def hash_password(plain_password: str) -> str:
         hashed = hash_password("MySecret123!")
         # store hashed in users.password_hash column
     """
-    return _pwd_context.hash(plain_password)
+    # Step 1: Convert to bytes
+    password_bytes = plain_password.encode("utf-8")
+
+    # Step 2: Pre-hash with SHA-256 (fixed length)
+    pre_hash = hashlib.sha256(password_bytes).digest()
+        # Step 3: Hash with bcrypt
+    return _pwd_context.hash(pre_hash)
+
+    #return _pwd_context.hash(plain_password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -114,7 +122,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         if not verify_password(form.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Invalid credentials")
     """
-    return _pwd_context.verify(plain_password, hashed_password)
+
+    password_bytes = plain_password.encode("utf-8")
+    pre_hash = hashlib.sha256(password_bytes).digest()
+
+    return _pwd_context.verify(pre_hash, hashed_password)
+
+    #return _pwd_context.verify(plain_password, hashed_password)
 
 
 # ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@ Security rule
     Pydantic's model_config with from_attributes=True reads ORM objects
     but only exposes fields explicitly declared in the schema.
 """
-
+import hashlib
 from datetime import datetime
 from typing import Optional
 

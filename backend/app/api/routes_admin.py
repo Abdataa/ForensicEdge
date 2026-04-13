@@ -51,11 +51,12 @@ router = APIRouter(prefix="/admin", tags=["Administration"])
     summary        = "List all system users",
 )
 async def list_users(
+    _:          AdminUser  ,
     role:       Optional[str] = None,
     is_active:  Optional[bool] = None,
     page:       int  = 1,
     limit:      int  = 20,
-    _:          AdminUser   = Depends(),
+
     db:         AsyncSession = Depends(get_db),
 ):
     """
@@ -99,7 +100,7 @@ async def list_users(
 async def create_user(
     payload: UserCreate,
     request: Request,
-    admin:   AdminUser   = Depends(),
+    admin:   AdminUser ,
     db:      AsyncSession = Depends(get_db),
 ):
     """
@@ -131,7 +132,7 @@ async def create_user(
 )
 async def get_user(
     user_id: int,
-    _:       AdminUser    = Depends(),
+    _:       AdminUser   ,
     db:      AsyncSession = Depends(get_db),
 ):
     """Retrieve details for any user by their ID."""
@@ -156,7 +157,7 @@ async def update_user(
     user_id: int,
     payload: UserUpdate,
     request: Request,
-    admin:   AdminUser    = Depends(),
+    admin:   AdminUser    ,
     db:      AsyncSession = Depends(get_db),
 ):
     """
@@ -215,7 +216,7 @@ async def update_user(
 async def delete_user(
     user_id: int,
     request: Request,
-    admin:   AdminUser    = Depends(),
+    admin:   AdminUser   ,
     db:      AsyncSession = Depends(get_db),
 ):
     """
@@ -264,11 +265,12 @@ async def delete_user(
     summary = "View system audit logs",
 )
 async def get_audit_logs(
+     _:           AdminUser    ,
     user_id:     Optional[int] = None,
     action_type: Optional[str] = None,
     page:        int           = 1,
     limit:       int           = 50,
-    _:           AdminUser     = Depends(),
+
     db:          AsyncSession  = Depends(get_db),
 ):
     """

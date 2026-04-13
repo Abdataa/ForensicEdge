@@ -70,10 +70,11 @@ async def submit_feedback(
     summary        = "List all feedback (admin / AI engineer)",
 )
 async def list_feedback(
+    _:          AIOrAdminUser  ,
     is_correct: Optional[bool] = None,
     page:       int            = 1,
     limit:      int            = 50,
-    _:          AIOrAdminUser  = Depends(),
+
     db:         AsyncSession   = Depends(get_db),
 ):
     """
@@ -98,7 +99,7 @@ async def list_feedback(
     summary = "Export incorrect cases for model retraining",
 )
 async def export_incorrect_feedback(
-    _:  AIOrAdminUser = Depends(),
+    _:  AIOrAdminUser ,
     db: AsyncSession  = Depends(get_db),
 ):
     """
@@ -124,7 +125,7 @@ async def export_incorrect_feedback(
 )
 async def get_feedback(
     feedback_id:  int,
-    _:            AIOrAdminUser = Depends(),
+    _:            AIOrAdminUser ,
     db:           AsyncSession  = Depends(get_db),
 ):
     """Retrieve a single feedback record by ID (admin/AI engineer only)."""
