@@ -113,6 +113,11 @@ class Settings(BaseSettings):
     MATCH_THRESHOLD:    float = 85.0    # >= this → "MATCH"
     POSSIBLE_THRESHOLD: float = 60.0    # >= this → "POSSIBLE MATCH"
 
+    #---------------------
+    # First admin bootstrap (used only on first startup)
+    FIRST_ADMIN_EMAIL:    str | None = None
+    FIRST_ADMIN_PASSWORD: str | None = None
+
     # ------------------------------------------------------------------
     # CORS — origins allowed to call the API
     # During development: include localhost frontend ports

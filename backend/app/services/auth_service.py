@@ -183,3 +183,70 @@ async def refresh_token(
         access_token = new_access_token,
         token_type   = "bearer",
     )
+
+#00000000000000000000000000000000000000000000000000000000000000000000000000000_
+
+async def change_password(
+    user:             User,
+    current_password: str,
+    new_password:     str,
+    db:               AsyncSession,
+) -> None:
+    """
+    Change a user's password after verifying their current one.
+    Called from POST /auth/change-password.
+
+    Raises:
+        HTTP 401 — current password is wrong
+    """
+    if not verify_password(current_password, user.password_hash):
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED,
+            detail      = "Current password is incorrect.",
+        )
+    user.password_hash = hash_password(new_password)
+    await db.commit()
+
+
+async def create_first_admin(db: AsyncSession) -> None:
+    """
+    Create the initial admin account on first startup if no users exist.
+    Credentials are read from FIRST_ADMIN_EMAIL and FIRST_ADMIN_PASSWORD
+    in the .env file.
+
+    This is the only way to bootstrap the system — once an admin exists,
+    all subsequent users are created by the admin via POST /admin/users.
+
+    Safe to call on every startup — does nothing if any user already exists.
+    """
+    from sqlalchemy import func
+    from app.core.config import settings
+
+    # Check if any user exists at all
+    result = await db.execute(select(func.count(User.id)))
+    count  = result.scalar()
+
+    if count and count > 0:
+        return  # system already bootstrapped
+
+    email    = getattr(settings, "FIRST_ADMIN_EMAIL",    None)
+    password = getattr(settings, "FIRST_ADMIN_PASSWORD", None)
+
+    if not email or not password:
+        print(
+            "WARNING: No users exist but FIRST_ADMIN_EMAIL / "
+            "FIRST_ADMIN_PASSWORD not set in .env. "
+            "Add them and restart to create the first admin account."
+        )
+        return
+
+    admin = User(
+        full_name     = "System Administrator",
+        email         = email,
+        password_hash = hash_password(password),
+        role          = UserRole.ADMIN.value,
+        is_active     = True,
+    )
+    db.add(admin)
+    await db.commit()
+    print(f"First admin account created: {email}")

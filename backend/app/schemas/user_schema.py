@@ -106,6 +106,32 @@ class RefreshRequest(BaseModel):
     """Body for POST /api/v1/auth/refresh."""
     refresh_token: str = Field(..., description="JWT refresh token")
 
+class ChangePasswordRequest(BaseModel):
+    """Body for POST /api/v1/auth/change-password."""
+    current_password: str = Field(
+        ...,
+        min_length = 1,
+        description = "The user's current password (or temporary password set by admin)",
+    )
+    new_password: str = Field(
+        ...,
+        min_length = 8,
+        max_length = 128,
+        description = "The new password to set",
+    )
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not any(c.islower() for c in v):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit.")
+        return v
+
+
 
 # ---------------------------------------------------------------------------
 # Response schemas

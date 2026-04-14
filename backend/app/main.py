@@ -69,6 +69,18 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     app_logger.info("Database tables created or verified")
+    # *******************8888888\/\/\_
+
+    # Bootstrap first admin account if no users exist
+    from app.services.auth_service import create_first_admin
+    from app.core.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
+        await create_first_admin(session)
+
+    #__፟፟_፟ ፟______፟
+
+
+
 
     # 3. Load inference engines — one per evidence type
     # Loaded once at startup, reused for all subsequent requests.
