@@ -24,35 +24,10 @@ AI-Optimized Evidence Analysis System for Fingerprint and Toolmark Comparison.
 Under Active Development (Senior Project - ASTU)
 
 
+##
 
 
-frontend/
-├── app/
-│   ├──
-│   ├──
-│   ├──
-│   ├──
-│   ├──
-│   │
-│
-├── components/
-│   ├──
-│   ├──
-│   ├──
-│
-├── public/
-│   ├──
-│   ├──
-│
-├── services/
-│   ├──
-│
-├── /
-│   ├──
-│
-├── /
-│
-└── /
+
 
 
 
