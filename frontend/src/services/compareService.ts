@@ -1,230 +1,140 @@
 /**
- * src/services/imageService.ts
- * ──────────────────────────────
- * Forensic evidence image upload and management.
+ * src/services/compareService.ts
+ * ────────────────────────────────
+ * Forensic image similarity comparison.
  *
  * Backend endpoints consumed
  * ───────────────────────────
- *   POST   /api/v1/images/upload         multipart/form-data → ImageUploadResponse
- *   GET    /api/v1/images                query params        → ImageListResponse
- *   GET    /api/v1/images/{id}                               → ImageResponse
- *   DELETE /api/v1/images/{id}                               → 204
+ *   POST /api/v1/compare            body: CompareRequest → SimilarityResponse
+ *   GET  /api/v1/compare            query params         → SimilarityListResponse
+ *   GET  /api/v1/compare/{id}                            → SimilarityResponse
  *
- * Evidence types
- * ───────────────
- *   "fingerprint" → stored under uploads/fingerprint/
- *                   processed by the fingerprint Siamese model
- *   "toolmark"    → stored under uploads/toolmark/
- *                   processed by the toolmark Siamese model
+ * Cross-type guard (enforced server-side)
+ * ────────────────────────────────────────
+ *   Comparing a fingerprint image against a toolmark image is
+ *   scientifically invalid.  The backend rejects such requests with
+ *   HTTP 400.  The frontend should also prevent this via
+ *   EvidenceTypeSelector, but the server guard is authoritative.
  *
- * Processing lifecycle (tracked by `status`)
- * ────────────────────────────────────────────
- *   uploaded → preprocessing → preprocessed → extracting → ready
- *   Any stage can transition to: failed
+ * Metric interpretation
+ * ──────────────────────
+ *   similarity_percentage — 0–100  (higher = more similar, investigator-facing)
+ *   cosine_similarity     — -1..1  (raw embedding dot product after L2-norm)
+ *   euclidean_distance    — 0..2   (L2 distance between unit-norm embeddings)
+ *   match_status          — "MATCH" | "POSSIBLE MATCH" | "NO MATCH"
  *
- *   The frontend polls GET /images/{id} after upload until
- *   status === "ready" before allowing a comparison.
+ * Default thresholds (configurable in backend .env)
+ *   similarity_percentage ≥ 85 → MATCH
+ *   similarity_percentage ≥ 60 → POSSIBLE MATCH
+ *   otherwise              → NO MATCH
  */
 
 import api from "./api";
+import { EvidenceType } from "./imageService";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type EvidenceType =
-  | "fingerprint"
-  | "toolmark";
-
-export type ImageStatus =
-  | "uploaded"
-  | "preprocessing"
-  | "preprocessed"
-  | "extracting"
-  | "ready"
-  | "failed";
-
-/** Matches PreprocessedImageResponse */
-export interface PreprocessedImageInfo {
-  id:            number;
-  enhanced_path: string;
-  created_at:    string;
-}
-
-/** Matches FeatureSetResponse */
-export interface FeatureSetInfo {
-  id:               number;
-  model_version_id: number | null;
-  created_at:       string;
-}
+export type MatchStatus =
+  | "MATCH"
+  | "POSSIBLE MATCH"
+  | "NO MATCH";
 
 /**
- * Matches ImageUploadResponse
- * Returned immediately after POST /images/upload.
- * status will be "uploaded" — processing begins asynchronously.
+ * Compact image info embedded inside SimilarityResponse.
+ * Matches ImageSummary in backend/app/schemas/similarity_schema.py
  */
-export interface ImageUploadResponse {
+export interface ImageSummary {
   id:                number;
   original_filename: string;
   evidence_type:     EvidenceType;
-  file_size_bytes:   number;
-  status:            ImageStatus;
   upload_date:       string;
-  message:           string;
 }
 
 /**
- * Matches ImageResponse
- * Full image record returned by GET /images/{id}.
- * Includes preprocessing and embedding metadata once processing completes.
- * Note: backend uses alias user_id → uploader_id
+ * Full similarity result.
+ * Matches SimilarityResponse in backend/app/schemas/similarity_schema.py
+ *
+ * image_1 — the query image (first argument to compare())
+ * image_2 — the reference image (second argument)
+ * requested_by_id — user ID who requested the comparison (or null)
  */
-export interface ImageResponse {
-  id:                 number;
-  original_filename:  string;
-  evidence_type:      EvidenceType;
-  file_size_bytes:    number;
-  status:             ImageStatus;
-  upload_date:        string;
-  uploader_id:        number;
-  preprocessed_image: PreprocessedImageInfo | null;
-  feature_set:        FeatureSetInfo        | null;
+export interface SimilarityResponse {
+  id:                    number;
+  similarity_percentage: number;       // [0, 100]
+  cosine_similarity:     number;       // [-1, 1]
+  euclidean_distance:    number;       // [0,  2]
+  match_status:          MatchStatus;
+  created_at:            string;
+  requested_by_id:       number | null;
+  image_1:               ImageSummary | null;
+  image_2:               ImageSummary | null;
 }
 
-/** Matches ImageListResponse */
-export interface ImageListResponse {
-  total:  number;
-  page:   number;
-  limit:  number;
-  images: ImageResponse[];
+/** Matches SimilarityListResponse */
+export interface SimilarityListResponse {
+  total:   number;
+  page:    number;
+  limit:   number;
+  results: SimilarityResponse[];
 }
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
-export const imageService = {
+export const compareService = {
 
   /**
-   * POST /api/v1/images/upload  (multipart/form-data)
+   * POST /api/v1/compare
+   * Runs forensic similarity analysis between two uploaded images.
    *
-   * Sends the image file and evidence_type as form fields.
-   * The backend validates, saves, preprocesses and embeds the image
-   * automatically.  The returned status will initially be "uploaded".
+   * Prerequisites (enforced by backend):
+   *   - Both images must belong to the current user (or user is admin)
+   *   - Both images must have status === "ready"
+   *   - Both images must be the SAME evidence type
+   *   - image_id_1 must not equal image_id_2
    *
-   * @param file          — File object from <input type="file">
-   * @param evidenceType  — "fingerprint" | "toolmark"
-   * @param onProgress    — optional callback receiving 0–100 upload %
+   * @param imageId1 — ID of the query evidence image
+   * @param imageId2 — ID of the reference evidence image
    */
-  async upload(
-    file:          File,
-    evidenceType:  EvidenceType,
-    onProgress?:   (percent: number) => void,
-  ): Promise<ImageUploadResponse> {
-    const form = new FormData();
-    form.append("file",          file);
-    form.append("evidence_type", evidenceType);
+  async compare(
+    imageId1: number,
+    imageId2: number,
+  ): Promise<SimilarityResponse> {
+    const { data } = await api.post<SimilarityResponse>("/compare", {
+      image_id_1: imageId1,
+      image_id_2: imageId2,
+    });
+    return data;
+  },
 
-    const { data } = await api.post<ImageUploadResponse>(
-      "/images/upload",
-      form,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (progressEvent) => {
-          if (onProgress && progressEvent.total) {
-            const pct = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            onProgress(pct);
-          }
-        },
-      },
+  /**
+   * GET /api/v1/compare/{id}
+   * Retrieves a single past comparison result by its ID.
+   * Used to reload a result from the history page.
+   */
+  async get(resultId: number): Promise<SimilarityResponse> {
+    const { data } = await api.get<SimilarityResponse>(
+      `/compare/${resultId}`
     );
     return data;
   },
 
   /**
-   * GET /api/v1/images/{id}
-   * Returns full image metadata including current processing status.
-   * Call this to poll until status === "ready".
-   */
-  async get(imageId: number): Promise<ImageResponse> {
-    const { data } = await api.get<ImageResponse>(`/images/${imageId}`);
-    return data;
-  },
-
-  /**
-   * GET /api/v1/images
-   * Returns a paginated list of images for the current user.
+   * GET /api/v1/compare
+   * Returns paginated comparison history for the current user.
    *
-   * @param params.evidence_type — filter to one type (optional)
-   * @param params.page          — 1-based page number (default 1)
+   * @param params.evidence_type — filter to "fingerprint" | "toolmark" (optional)
+   * @param params.page          — 1-based page (default 1)
    * @param params.limit         — records per page (default 20)
    */
   async list(params?: {
     evidence_type?: EvidenceType;
     page?:          number;
     limit?:         number;
-  }): Promise<ImageListResponse> {
-    const { data } = await api.get<ImageListResponse>("/images", { params });
+  }): Promise<SimilarityListResponse> {
+    const { data } = await api.get<SimilarityListResponse>(
+      "/compare",
+      { params },
+    );
     return data;
-  },
-
-  /**
-   * DELETE /api/v1/images/{id}
-   * Permanently removes the image, its enhanced copy, and its embedding.
-   */
-  async delete(imageId: number): Promise<void> {
-    await api.delete(`/images/${imageId}`);
-  },
-
-  /**
-   * Polls GET /images/{id} at a fixed interval until status === "ready"
-   * or status === "failed", or the timeout is exceeded.
-   *
-   * @param imageId    — ID returned by upload()
-   * @param onStatus   — called on every poll with the current status
-   * @param intervalMs — polling interval in ms (default 2 000)
-   * @param timeoutMs  — give up after this many ms (default 120 000)
-   *
-   * @returns Promise that resolves with the final ImageResponse when ready,
-   *          or rejects with an Error on failure / timeout.
-   */
-  pollUntilReady(
-    imageId:     number,
-    onStatus?:   (status: ImageStatus) => void,
-    intervalMs = 2_000,
-    timeoutMs  = 120_000,
-  ): Promise<ImageResponse> {
-    const deadline = Date.now() + timeoutMs;
-
-    return new Promise<ImageResponse>((resolve, reject) => {
-      const tick = async () => {
-        try {
-          const image = await imageService.get(imageId);
-          onStatus?.(image.status);
-
-          if (image.status === "ready") {
-            resolve(image);
-          } else if (image.status === "failed") {
-            reject(
-              new Error(
-                `Processing failed for image ${imageId}. ` +
-                `Please re-upload the image.`,
-              )
-            );
-          } else if (Date.now() > deadline) {
-            reject(
-              new Error(
-                `Processing timed out for image ${imageId} after ` +
-                `${timeoutMs / 1000}s.`,
-              )
-            );
-          } else {
-            setTimeout(tick, intervalMs);
-          }
-        } catch (err) {
-          reject(err);
-        }
-      };
-
-      tick();
-    });
   },
 };
