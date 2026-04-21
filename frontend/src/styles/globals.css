@@ -14,8 +14,9 @@
   }
 
   body {
-    @apply bg-gray-950 text-gray-100 min-h-screen;
-  }
+  background-color: #0a0f1a;   /* replace bg-gray-950 */
+  @apply text-gray-100 min-h-screen;
+}
 
   /* Thin dark scrollbars — matches the dark theme */
   ::-webkit-scrollbar             { width: 5px; height: 5px; }
@@ -25,8 +26,10 @@
 
   /* Focus ring — keyboard navigation visibility */
   :focus-visible {
-    @apply outline-none ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-950;
-  }
+  outline: none;
+  @apply ring-2 ring-blue-500 ring-offset-2;
+  ring-offset-color: #0a0f1a;   /* replace ring-offset-gray-950 */
+}
 
   /* Headings */
   h1, h2, h3, h4, h5, h6 {
