@@ -1,0 +1,190 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BASE
+   Reset and global element styles
+───────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    @apply antialiased;
+    /* Smooth scrolling for in-page anchor links */
+    scroll-behavior: smooth;
+  }
+
+  body {
+  background-color: #0a0f1a;   /* replace bg-gray-950 */
+  @apply text-gray-100 min-h-screen;
+}
+
+  /* Thin dark scrollbars — matches the dark theme */
+  ::-webkit-scrollbar             { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track       { @apply bg-gray-900; }
+  ::-webkit-scrollbar-thumb       { @apply bg-gray-700 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-500; }
+
+  /* Focus ring — keyboard navigation visibility */
+  :focus-visible {
+  outline: none;
+  @apply ring-2 ring-blue-500 ring-offset-2;
+  ring-offset-color: #0a0f1a;   /* replace ring-offset-gray-950 */
+}
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-white font-semibold leading-tight;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   COMPONENTS
+   Reusable utility classes referenced by components and pages
+───────────────────────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Cards ─────────────────────────────────────────────────────────────── */
+  .card {
+    @apply bg-gray-900 border border-gray-800 rounded-2xl p-6;
+  }
+
+  /* ── Form fields ────────────────────────────────────────────────────────── */
+  .field {
+    @apply w-full bg-gray-800 border border-gray-700 rounded-lg
+           px-4 py-2.5 text-white text-sm placeholder-gray-600
+           focus:outline-none focus:ring-2 focus:ring-blue-500
+           focus:border-transparent transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .field-label {
+    @apply block text-gray-400 text-sm font-medium mb-1.5;
+  }
+
+  .field-error {
+    @apply text-red-400 text-xs mt-1;
+  }
+
+  /* ── Buttons ────────────────────────────────────────────────────────────── */
+  /* Base (shared by all variants) */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2
+           font-medium rounded-lg transition-colors duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Variant modifiers — combined with .btn in Button.tsx via clsx */
+  .btn-primary {
+    @apply btn bg-blue-600 hover:bg-blue-500 active:bg-blue-700
+           text-white border border-transparent
+           text-sm px-5 py-2.5;
+  }
+
+  .btn-secondary {
+    @apply btn bg-gray-800 hover:bg-gray-700 active:bg-gray-900
+           text-gray-300 hover:text-white border border-gray-700
+           text-sm px-5 py-2.5;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-700 hover:bg-red-600 active:bg-red-800
+           text-white border border-transparent
+           text-sm px-5 py-2.5;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-gray-800
+           text-gray-400 hover:text-white border border-transparent
+           text-sm px-5 py-2.5;
+  }
+
+  /* ── Badges ─────────────────────────────────────────────────────────────── */
+  /* Base pill shape — extended by colour variants below */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full
+           text-xs font-medium whitespace-nowrap;
+  }
+
+  .badge-blue   { @apply badge bg-blue-950   text-blue-400   border border-blue-800; }
+  .badge-green  { @apply badge bg-green-950  text-green-400  border border-green-800; }
+  .badge-yellow { @apply badge bg-yellow-950 text-yellow-400 border border-yellow-800; }
+  .badge-red    { @apply badge bg-red-950    text-red-400    border border-red-800; }
+  .badge-gray   { @apply badge bg-gray-800   text-gray-400   border border-gray-700; }
+
+  /* ── Table ──────────────────────────────────────────────────────────────── */
+  .tbl {
+    @apply w-full text-sm text-left;
+  }
+  .tbl thead tr {
+    @apply border-b border-gray-800;
+  }
+  .tbl thead th {
+    @apply px-4 py-3 text-gray-500 font-medium text-xs
+           uppercase tracking-wide whitespace-nowrap;
+  }
+  .tbl tbody tr {
+    @apply border-b border-gray-800/50
+           hover:bg-gray-800/30 transition-colors;
+  }
+  .tbl tbody td {
+    @apply px-4 py-3 text-gray-300;
+  }
+  /* Last row — no bottom border */
+  .tbl tbody tr:last-child {
+    @apply border-b-0;
+  }
+
+  /* ── Section title ──────────────────────────────────────────────────────── */
+  .section-title {
+    @apply text-white font-semibold text-base leading-none;
+  }
+
+  /* ── Stat cards ─────────────────────────────────────────────────────────── */
+  /* Used by StatCard component in Card.tsx */
+  .stat-value {
+    @apply text-3xl font-bold text-white tabular-nums leading-none;
+  }
+  .stat-label {
+    @apply text-gray-500 text-sm;
+  }
+
+  /* ── Alert/banner strips ────────────────────────────────────────────────── */
+  .alert-error {
+    @apply bg-red-950 border border-red-800 rounded-xl
+           px-4 py-3 text-red-400 text-sm;
+  }
+  .alert-success {
+    @apply bg-green-950 border border-green-800 rounded-xl
+           px-4 py-3 text-green-300 text-sm;
+  }
+  .alert-warning {
+    @apply bg-yellow-950 border border-yellow-800 rounded-xl
+           px-4 py-3 text-yellow-300 text-sm;
+  }
+  .alert-info {
+    @apply bg-blue-950 border border-blue-800 rounded-xl
+           px-4 py-3 text-blue-300 text-sm;
+  }
+
+  /* ── Empty state container ──────────────────────────────────────────────── */
+  /* Centred icon + heading + description pattern used across pages */
+  .empty-state {
+    @apply flex flex-col items-center justify-center
+           text-center py-16 space-y-4;
+  }
+  .empty-state-icon {
+    @apply w-16 h-16 rounded-2xl bg-gray-800
+           flex items-center justify-center mx-auto;
+  }
+
+  /* ── Page layout helpers ────────────────────────────────────────────────── */
+  /* Applied to the scrollable main element inside AppLayout */
+  .page-body {
+    @apply flex-1 overflow-y-auto p-6 space-y-6;
+  }
+
+  /* Divider line */
+  .divider {
+    @apply border-t border-gray-800 my-2;
+  }
+}
