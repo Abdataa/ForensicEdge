@@ -31,6 +31,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
 from app.core.config  import settings
 from app.models.forensic_image import (
     ForensicImage,
@@ -208,10 +209,13 @@ async def _preprocess_and_embed(
         # Stage 1 — preprocessing
         image.status = "preprocessing"
         await db.commit()
+        from ai_engine.inference.preprocess import preprocess_from_bytes
 
         # preprocess_from_bytes applies the same pipeline as enhance.py
         # and returns a (1, 1, 224, 224) float32 tensor
-        _ = preprocess_from_bytes(file_bytes)
+        #_ = preprocess_from_bytes(file_bytes)
+        tensor = preprocess_from_bytes(file_bytes)
+
 
         # Save preprocessed image to disk
         preprocessed_dir  = settings.UPLOAD_DIR / "preprocessed" / image.evidence_type
@@ -222,7 +226,7 @@ async def _preprocess_and_embed(
         # Write enhanced image (convert tensor back to uint8 for storage)
         import cv2
         import numpy as np
-        tensor = preprocess_from_bytes(file_bytes)
+
         # tensor is normalised to [-1,1] — convert back to uint8 for saving
         img_np = ((tensor.squeeze().numpy() + 1.0) / 2.0 * 255).astype(np.uint8)
         cv2.imwrite(str(enhanced_path), img_np)
@@ -248,7 +252,7 @@ async def _preprocess_and_embed(
 
         # Route to correct model based on evidence type
         engine    = get_engine(evidence_type=image.evidence_type)
-        embedding = engine.extract_embedding(file_bytes)
+        embedding = engine.extract_embedding(tensor)
         # embedding is (1, 256) float32 tensor — store as flat JSON list
         vector = embedding.squeeze().tolist()
 
