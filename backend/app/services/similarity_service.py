@@ -43,6 +43,8 @@ from app.schemas.similarity_schema import (
 from app.services.log_service import create_log
 
 from ai_engine.inference.compare  import get_engine
+from app.services.image_service import _weights_path_for
+
 
 
 # ---------------------------------------------------------------------------
@@ -104,13 +106,14 @@ async def compare(
         )
 
     evidence_type = image_1.evidence_type   # same for both at this point
+    weights = _weights_path_for(evidence_type)
 
     # Load stored feature vectors from DB
     emb1_tensor = await _load_embedding(image_1.id, db)
     emb2_tensor = await _load_embedding(image_2.id, db)
 
     # Run comparison using the correct model for this evidence type
-    engine = get_engine(evidence_type=evidence_type)
+    engine = get_engine(weights_path=weights)
 
     with torch.no_grad():
         similarity = engine._model.similarity_percentage(
