@@ -29,7 +29,7 @@ import axios, {
 } from "axios";
 
 // ── Base URL ────────────────────────────────────────────────────────────────
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/v1/cases";
 
 // ── Token helpers ────────────────────────────────────────────────────────────
 const isClient = typeof window !== "undefined";
