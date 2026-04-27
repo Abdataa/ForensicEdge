@@ -1,20 +1,15 @@
 # backend/app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from core.database import engine, Base, test_connection
-from core.config import settings
-import logging
+from app.api import routes_auth
+from core.database import engine, Base
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Create tables (for development)
+Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="ForensicEdge API",
-    description="AI-Powered Forensic Analysis System",
-    version="1.0.0"
-)
+app = FastAPI(title="ForensicEdge API", version="1.0.0")
 
-# Configure CORS
+# CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -23,33 +18,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info("🚀 Starting ForensicEdge API...")
-    
-    # Test database connection
-    if not test_connection():
-        logger.error("Failed to connect to database. Exiting...")
-        exit(1)
-    
-    # Create tables (for development only)
-    logger.info("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("✅ Tables created successfully!")
+# Include auth routes
+app.include_router(routes_auth.router, prefix="/api/auth", tags=["Authentication"])
 
 @app.get("/")
-async def root():
-    return {
-        "message": "Welcome to ForensicEdge API",
-        "version": "1.0.0",
-        "status": "operational",
-        "database": "connected"
-    }
+def root():
+    return {"message": "ForensicEdge API is running"}
 
 @app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "database": "connected",
-        "api": "operational"
-    }
+def health():
+    return {"status": "healthy"}
