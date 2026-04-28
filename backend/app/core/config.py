@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     # AI Engine
     # ------------------------------------------------------------------
     # Path to best_model.pth produced by train_siamese.py
-    MODEL_WEIGHTS_PATH: Path = Path("ai_engine/models/weights/best_model.pth")
+    MODEL_WEIGHTS_PATH: Path = Path("ai_engine/models/weights/fingerprint_model_weights/best_model.pth")
     EMBEDDING_DIM:      int  = 256      # must match training config
 
     # Similarity thresholds — tune via experiments/threshold_experiment.py

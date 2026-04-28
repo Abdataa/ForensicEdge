@@ -33,3 +33,12 @@ from app.models.report            import Report            # noqa: F401
 from app.models.dataset           import Dataset           # noqa: F401
 from app.models.audit_log         import AuditLog          # noqa: F401
 from app.models.feedback          import Feedback          # noqa: F401
+
+# ── Case Management Subsystem (new) ──────────────────────────────────────────
+from app.models.case import (                              # noqa: F401
+    Case,
+    CaseEvidence,
+    CaseAnalysis,
+    CaseReport,
+    CaseNote,
+)

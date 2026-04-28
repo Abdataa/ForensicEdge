@@ -17,6 +17,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database  import Base
 from app.core.security  import UserRole
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .case import Case
 
 
 class User(Base):
@@ -115,6 +119,25 @@ class User(Base):
         back_populates = "user",
         cascade        = "all, delete-orphan",
         lazy           = "select",
+    )
+
+    # ------------------------------------------------------------------
+# Case Management relationships
+# ------------------------------------------------------------------
+     # Cases this user created
+
+    created_cases: Mapped[list["Case"]] = relationship(   # noqa: F821
+        "Case",
+        foreign_keys="[Case.created_by]",
+        back_populates="creator",
+        lazy="select",
+    )
+   # Cases assigned to this user
+    assigned_cases: Mapped[list["Case"]] = relationship(  # noqa: F821
+        "Case",
+        foreign_keys="[Case.assigned_to]",
+        back_populates="assignee",
+        lazy="select",
     )
 
     def __repr__(self) -> str:
