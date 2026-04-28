@@ -1,7 +1,4 @@
-
-/** *
- *updated script with side-by-side original vs enhanced comparison modal and delete functionality.
- * ──────────────────────
+/** below scripts is old or earlier script before adding side-by-side original vs enhanced comparison 
  * src/pages/upload.tsx
  * ──────────────────────
  * Evidence image upload page.
@@ -37,39 +34,33 @@
  * Shows a confirmation toast on success / error.
  */
 
-import { useState, useEffect } from "react";
-import Head    from "next/head";
-import { Trash2, Upload as UploadIcon, Eye } from "lucide-react";
-import toast   from "react-hot-toast";
+import { useState, useEffect }  from "react";
+import Head            from "next/head";
+import { Trash2, Upload as UploadIcon } from "lucide-react";
+import toast           from "react-hot-toast";
 
-import AppLayout            from "../components/layout/AppLayout";
-import Card                 from "../components/ui/Card";
-import Button               from "../components/ui/Button";
+import AppLayout              from "../components/layout/AppLayout";
+import Card                   from "../components/ui/Card";
+import Button                 from "../components/ui/Button";
 import { EvidenceBadge, StatusBadge } from "../components/ui/Badge";
-import Spinner              from "../components/ui/Spinner";
-import Modal                from "../components/ui/modal";
-import EvidenceTypeSelector from "../components/forensic/EvidenceTypeSelector";
-import ImageUploader        from "../components/forensic/ImageUploader";
-import ImageComparison      from "../components/forensic/ImageComparison";
+import Spinner                from "../components/ui/Spinner";
+import EvidenceTypeSelector   from "../components/forensic/EvidenceTypeSelector";
+import ImageUploader          from "../components/forensic/ImageUploader";
 
 import {
   imageService,
   ImageResponse,
   EvidenceType,
-  ComparisonResponse,
 } from "../services/imageService";
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function UploadPage() {
   const [evidenceType, setEvidenceType] = useState<EvidenceType>("fingerprint");
   const [recentImages, setRecentImages] = useState<ImageResponse[]>([]);
   const [loadingList,  setLoadingList]  = useState(true);
+  // Track which row is being deleted so we can show a per-row spinner
   const [deletingId,   setDeletingId]   = useState<number | null>(null);
-
-  // Comparison modal state
-  const [comparisonOpen,  setComparisonOpen]  = useState(false);
-  const [comparisonData,  setComparisonData]  = useState<ComparisonResponse | null>(null);
-  const [comparisonLoad,  setComparisonLoad]  = useState(false);
-  const [comparisonTitle, setComparisonTitle] = useState("");
 
   // Load recent uploads on mount
   useEffect(() => {
@@ -80,10 +71,12 @@ export default function UploadPage() {
       .finally(() => setLoadingList(false));
   }, []);
 
+  // Called by ImageUploader when an image reaches status=ready
   const handleUploadComplete = (image: ImageResponse) => {
     setRecentImages((prev) => [image, ...prev.slice(0, 9)]);
   };
 
+  // Delete a single image
   const handleDelete = async (image: ImageResponse) => {
     if (!confirm(`Delete "${image.original_filename}"? This cannot be undone.`)) return;
     setDeletingId(image.id);
@@ -98,35 +91,13 @@ export default function UploadPage() {
     }
   };
 
-  // Open the original vs enhanced comparison modal for a given image
-  const handleViewComparison = async (image: ImageResponse) => {
-    setComparisonTitle(image.original_filename);
-    setComparisonData(null);
-    setComparisonOpen(true);
-    setComparisonLoad(true);
-    try {
-      const result = await imageService.getComparison(image.id);
-      setComparisonData(result);
-    } catch {
-      toast.error("Could not load image comparison.");
-      setComparisonOpen(false);
-    } finally {
-      setComparisonLoad(false);
-    }
-  };
-
-  // Determine whether comparison is viewable
-  // Comparison is always available — shows "pending" state if not yet enhanced
-  const canCompare = (img: ImageResponse) =>
-    img.status !== "uploaded";  // at minimum preprocessing has started
-
   return (
     <>
       <Head><title>Upload Evidence — ForensicEdge</title></Head>
 
       <AppLayout title="Upload Evidence">
 
-        {/* Evidence type selector */}
+        {/* ── Evidence type selector ────────────────────────────────────── */}
         <Card>
           <EvidenceTypeSelector
             value={evidenceType}
@@ -134,21 +105,28 @@ export default function UploadPage() {
           />
         </Card>
 
-        {/* Uploader */}
+        {/* ── Uploader ──────────────────────────────────────────────────── */}
         <Card title="Upload Image">
           <ImageUploader
             evidenceType={evidenceType}
             label={`Upload ${evidenceType} evidence image`}
             onComplete={handleUploadComplete}
           />
+
+          {/* Accepted formats note */}
           <p className="text-gray-600 text-xs mt-3 leading-relaxed">
-            Accepted: BMP, PNG, JPG · Max 10 MB ·
-            Image is enhanced (bilateral filter + CLAHE + ridge sharpening) automatically after upload.
+            Accepted formats: BMP, PNG, JPG, JPEG · Max file size: 10 MB
+            <br />
+            The image is validated, enhanced (bilateral filter + CLAHE + ridge
+            sharpening), and embedded by the CNN automatically after upload.
           </p>
         </Card>
 
-        {/* Recent uploads table */}
-        <Card title="Recent Uploads" padding="p-0">
+        {/* ── Recent uploads ────────────────────────────────────────────── */}
+        <Card
+          title="Recent Uploads"
+          padding="p-0"
+        >
           {loadingList ? (
             <div className="flex justify-center py-10">
               <Spinner size="md" />
@@ -161,7 +139,9 @@ export default function UploadPage() {
                 <UploadIcon size={24} className="text-gray-600" />
               </div>
               <p className="text-gray-500 text-sm">No images uploaded yet.</p>
-              <p className="text-gray-600 text-xs">Upload an image above to get started.</p>
+              <p className="text-gray-600 text-xs">
+                Upload an image above to get started.
+              </p>
             </div>
 
           ) : (
@@ -174,56 +154,49 @@ export default function UploadPage() {
                     <th>Size</th>
                     <th>Status</th>
                     <th>Uploaded</th>
-                    <th>Compare</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentImages.map((img) => (
                     <tr key={img.id}>
-
                       {/* Filename */}
                       <td>
                         <span
-                          className="block truncate max-w-[180px] text-white text-sm"
+                          className="block truncate max-w-[200px] text-white"
                           title={img.original_filename}
                         >
                           {img.original_filename}
                         </span>
-                        <span className="text-gray-600 text-xs">ID: {img.id}</span>
+                        <span className="text-gray-600 text-xs">
+                          ID: {img.id}
+                        </span>
                       </td>
 
                       {/* Evidence type */}
-                      <td><EvidenceBadge type={img.evidence_type} /></td>
+                      <td>
+                        <EvidenceBadge type={img.evidence_type} />
+                      </td>
 
-                      {/* Size */}
-                      <td className="text-gray-400 whitespace-nowrap text-xs">
+                      {/* File size */}
+                      <td className="text-gray-400 whitespace-nowrap">
                         {(img.file_size_bytes / 1024).toFixed(1)} KB
                       </td>
 
                       {/* Processing status */}
-                      <td><StatusBadge status={img.status} /></td>
+                      <td>
+                        <StatusBadge status={img.status} />
+                      </td>
 
                       {/* Upload date */}
                       <td className="text-gray-500 text-xs whitespace-nowrap">
                         {new Date(img.upload_date).toLocaleString(undefined, {
-                          month: "short", day: "numeric",
-                          hour: "2-digit", minute: "2-digit",
+                          month:  "short",
+                          day:    "numeric",
+                          year:   "numeric",
+                          hour:   "2-digit",
+                          minute: "2-digit",
                         })}
-                      </td>
-
-                      {/* View original vs enhanced button */}
-                      <td>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          icon={<Eye size={13} />}
-                          disabled={!canCompare(img)}
-                          onClick={() => handleViewComparison(img)}
-                          className="whitespace-nowrap"
-                        >
-                          View
-                        </Button>
                       </td>
 
                       {/* Delete */}
@@ -242,7 +215,6 @@ export default function UploadPage() {
                           className="text-gray-600 hover:text-red-400"
                         />
                       </td>
-
                     </tr>
                   ))}
                 </tbody>
@@ -252,28 +224,6 @@ export default function UploadPage() {
         </Card>
 
       </AppLayout>
-
-      {/* ── Original vs Enhanced modal ───────────────────────────────────── */}
-      <Modal
-        open={comparisonOpen}
-        onClose={() => setComparisonOpen(false)}
-        title={`Original vs Enhanced — ${comparisonTitle}`}
-        maxWidth="max-w-3xl"
-      >
-        {comparisonLoad ? (
-          <div className="flex items-center justify-center gap-3 py-16">
-            <Spinner size="md" />
-            <p className="text-gray-400 text-sm">Loading image data…</p>
-          </div>
-        ) : comparisonData ? (
-          <ImageComparison
-            data={comparisonData}
-            modal
-          />
-        ) : null}
-      </Modal>
     </>
   );
 }
-
-

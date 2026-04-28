@@ -95,6 +95,34 @@ export interface ImageListResponse {
   page:   number;
   limit:  number;
   images: ImageResponse[];
+
+}
+
+/** Shape of a single image side in the comparison response */
+export interface ComparisonImageData {
+  filename:     string;
+  /** base64 data URI — ready for <img src={...} /> */
+  data:         string;
+  size_bytes?:  number;
+  evidence_type?: EvidenceType;
+}
+
+/** Shape of the enhanced side (null if preprocessing not done) */
+export interface ComparisonEnhancedData {
+  filename:    string;
+  data:        string;
+  processing:  Record<string, unknown>;
+}
+
+/**
+ * Matches GET /api/v1/images/{id}/comparison response.
+ * Both images are base64 data URIs — no extra fetch needed to display.
+ */
+export interface ComparisonResponse {
+  image_id: number;
+  original: ComparisonImageData;
+  enhanced: ComparisonEnhancedData | null;
+  status:   ImageStatus;
 }
 
 // ── Service ──────────────────────────────────────────────────────────────────
@@ -173,6 +201,26 @@ export const imageService = {
   async delete(imageId: number): Promise<void> {
     await api.delete(`/images/${imageId}`);
   },
+  /**
+   * GET /api/v1/images/{id}/comparison
+   *
+   * Returns the original uploaded image AND the preprocessed (enhanced)
+   * version as base64 data URIs for side-by-side display.
+   *
+   * The enhanced field is null when:
+   *   - Preprocessing has not completed yet
+   *   - Image processing failed
+   *
+   * Both data fields are ready to use directly as <img src={...} />.
+   * No additional fetch needed — the bytes are embedded in the response.
+   */
+  async getComparison(imageId: number): Promise<ComparisonResponse> {
+    const { data } = await api.get<ComparisonResponse>(
+      `/images/${imageId}/comparison`,
+    );
+    return data;
+  },
+
 
   /**
    * Polls GET /images/{id} at a fixed interval until status === "ready"
