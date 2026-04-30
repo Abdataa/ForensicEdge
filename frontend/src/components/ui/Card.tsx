@@ -113,6 +113,7 @@ interface StatCardProps {
   className?: string;
   /** onClick for making the tile a link-like button */
   onClick?:   () => void;
+  
 }
 
 /**

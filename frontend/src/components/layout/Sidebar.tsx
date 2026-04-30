@@ -75,6 +75,12 @@ const NAV_ITEMS: NavItem[] = [
     icon:  <GitCompare size={18} />,
   },
   {
+    href:  "/cases",
+    label: "Case Management",
+    icon:  <FileText size={18} />,
+  },
+
+  {
     href:  "/reports",
     label: "Reports",
     icon:  <FileText size={18} />,
@@ -99,7 +105,10 @@ const NAV_ITEMS: NavItem[] = [
     label:  "User Management",
     icon:   <Users size={18} />,
     roles:  ["admin"],
+
   },
+
+
 ];
 
 // ── Role badge colours ────────────────────────────────────────────────────────

@@ -19,12 +19,17 @@ import { useState, useEffect } from "react";
 import Head from "next/head";
 import { History } from "lucide-react";
 import clsx from "clsx";
+import { useAuth } from "../hooks/useAuth";
 
 import AppLayout from "../components/layout/AppLayout";
 import Card      from "../components/ui/Card";
 import Button    from "../components/ui/Button";
 import Spinner   from "../components/ui/Spinner";
 import api       from "../services/api";
+
+
+
+
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
