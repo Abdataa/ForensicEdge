@@ -67,7 +67,8 @@ export interface SimilarityResponse {
   created_at:            string;
   requested_by_id:       number | null;
   image_1:               ImageSummary | null;
-  image_2:               ImageSummary | null;
+  image_2:               ImageSummary| null;
+  evidence_type:         EvidenceType;
 }
 
 /** Matches SimilarityListResponse */

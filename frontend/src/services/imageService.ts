@@ -1,38 +1,28 @@
 /**
  * src/services/imageService.ts
- * ──────────────────────────────
- * Forensic evidence image upload and management.
+ * ─────────────────────────────
+ * All forensic image + comparison API calls.
  *
- * Backend endpoints consumed
- * ───────────────────────────
- *   POST   /api/v1/images/upload         multipart/form-data → ImageUploadResponse
- *   GET    /api/v1/images                query params        → ImageListResponse
- *   GET    /api/v1/images/{id}                               → ImageResponse
- *   DELETE /api/v1/images/{id}                               → 204
+ * Covers every backend endpoint:
+ *   POST   /images/upload
+ *   GET    /images                     (paginated, filterable)
+ *   GET    /images/{id}
+ *   DELETE /images/{id}
+ *   GET    /images/{id}/comparison     (original vs enhanced)
  *
- * Evidence types
- * ───────────────
- *   "fingerprint" → stored under uploads/fingerprint/
- *                   processed by the fingerprint Siamese model
- *   "toolmark"    → stored under uploads/toolmark/
- *                   processed by the toolmark Siamese model
- *
- * Processing lifecycle (tracked by `status`)
- * ────────────────────────────────────────────
- *   uploaded → preprocessing → preprocessed → extracting → ready
- *   Any stage can transition to: failed
- *
- *   The frontend polls GET /images/{id} after upload until
- *   status === "ready" before allowing a comparison.
+ *   POST   /compare                    (two-image similarity)
+ *   GET    /compare                    (list past results)
+ *   GET    /compare/{id}               (single result)
+ *   POST   /compare/search             (single-image database search)  ← NEW
  */
 
 import api from "./api";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared types
+// ─────────────────────────────────────────────────────────────────────────────
 
-export type EvidenceType =
-  | "fingerprint"
-  | "toolmark";
+export type EvidenceType = "fingerprint" | "toolmark";
 
 export type ImageStatus =
   | "uploaded"
@@ -42,25 +32,33 @@ export type ImageStatus =
   | "ready"
   | "failed";
 
-/** Matches PreprocessedImageResponse */
-export interface PreprocessedImageInfo {
-  id:            number;
-  enhanced_path: string;
-  created_at:    string;
-}
+export type MatchStatus = "MATCH" | "POSSIBLE MATCH" | "NO MATCH";
 
-/** Matches FeatureSetResponse */
-export interface FeatureSetInfo {
+// ── Image types ──────────────────────────────────────────────────────────────
+
+export interface PreprocessedImageInfo {
   id:               number;
-  model_version_id: number | null;
+  enhanced_path:    string;
+  processing_steps: Record<string, unknown>;
   created_at:       string;
 }
 
-/**
- * Matches ImageUploadResponse
- * Returned immediately after POST /images/upload.
- * status will be "uploaded" — processing begins asynchronously.
- */
+export interface FeatureSetInfo {
+  id:         number;
+  created_at: string;
+}
+
+export interface ImageResponse {
+  id:                number;
+  original_filename: string;
+  evidence_type:     EvidenceType;
+  file_size_bytes:   number;
+  status:            ImageStatus;
+  upload_date:       string;
+  preprocessed_image?: PreprocessedImageInfo | null;
+  feature_set?:        FeatureSetInfo        | null;
+}
+
 export interface ImageUploadResponse {
   id:                number;
   original_filename: string;
@@ -68,123 +66,105 @@ export interface ImageUploadResponse {
   file_size_bytes:   number;
   status:            ImageStatus;
   upload_date:       string;
-  message:           string;
 }
 
-/**
- * Matches ImageResponse
- * Full image record returned by GET /images/{id}.
- * Includes preprocessing and embedding metadata once processing completes.
- * Note: backend uses alias user_id → uploader_id
- */
-export interface ImageResponse {
-  id:                 number;
-  original_filename:  string;
-  evidence_type:      EvidenceType;
-  file_size_bytes:    number;
-  status:             ImageStatus;
-  upload_date:        string;
-  uploader_id:        number;
-  preprocessed_image: PreprocessedImageInfo | null;
-  feature_set:        FeatureSetInfo        | null;
-}
-
-/** Matches ImageListResponse */
 export interface ImageListResponse {
   total:  number;
   page:   number;
   limit:  number;
   images: ImageResponse[];
-
 }
 
-/** Shape of a single image side in the comparison response */
-export interface ComparisonImageData {
-  filename:     string;
-  /** base64 data URI — ready for <img src={...} /> */
-  data:         string;
-  size_bytes?:  number;
-  evidence_type?: EvidenceType;
-}
-
-/** Shape of the enhanced side (null if preprocessing not done) */
-export interface ComparisonEnhancedData {
-  filename:    string;
-  data:        string;
-  processing:  Record<string, unknown>;
-}
-
-/**
- * Matches GET /api/v1/images/{id}/comparison response.
- * Both images are base64 data URIs — no extra fetch needed to display.
- */
 export interface ComparisonResponse {
   image_id: number;
-  original: ComparisonImageData;
-  enhanced: ComparisonEnhancedData | null;
-  status:   ImageStatus;
+  original: {
+    filename:      string;
+    data:          string;   // base64 data URI
+    size_bytes:    number;
+    evidence_type: EvidenceType;
+  };
+  enhanced: {
+    filename:   string;
+    data:       string;   // base64 data URI
+    processing: Record<string, unknown>;
+  } | null;
+  status: ImageStatus;
 }
 
-// ── Service ──────────────────────────────────────────────────────────────────
+// ── Similarity / comparison types ─────────────────────────────────────────────
+
+export interface ImageSummary {
+  id:                number;
+  original_filename: string;
+  evidence_type:     EvidenceType;
+  status:            ImageStatus;
+  upload_date:       string;
+}
+
+export interface SimilarityResponse {
+  id:                    number;
+  image_1:               ImageSummary;
+  image_2:               ImageSummary;
+  similarity_percentage: number;
+  match_status:          MatchStatus;
+  cosine_similarity:     number;
+  euclidean_distance:    number;
+  evidence_type:         EvidenceType;
+  created_at:            string;
+}
+
+export interface SimilarityListResponse {
+  total:   number;
+  page:    number;
+  limit:   number;
+  results: SimilarityResponse[];
+}
+
+// Single-image database search result — one candidate per match
+export interface SearchCandidate {
+  image:                 ImageSummary;
+  similarity_percentage: number;
+  match_status:          MatchStatus;
+  cosine_similarity:     number;
+  euclidean_distance:    number;
+}
+
+export interface DatabaseSearchResponse {
+  query_image:   ImageSummary;
+  total_searched: number;
+  candidates:    SearchCandidate[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const imageService = {
 
-  /**
-   * POST /api/v1/images/upload  (multipart/form-data)
-   *
-   * Sends the image file and evidence_type as form fields.
-   * The backend validates, saves, preprocesses and embeds the image
-   * automatically.  The returned status will initially be "uploaded".
-   *
-   * @param file          — File object from <input type="file">
-   * @param evidenceType  — "fingerprint" | "toolmark"
-   * @param onProgress    — optional callback receiving 0–100 upload %
-   */
+  // ── Images ────────────────────────────────────────────────────────────────
+
+  /** Upload a new forensic evidence image. */
   async upload(
     file:          File,
     evidenceType:  EvidenceType,
-    onProgress?:   (percent: number) => void,
+    onProgress?:   (pct: number) => void,
   ): Promise<ImageUploadResponse> {
     const form = new FormData();
     form.append("file",          file);
     form.append("evidence_type", evidenceType);
 
-    const { data } = await api.post<ImageUploadResponse>(
-      "/images/upload",
-      form,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (progressEvent) => {
-          if (onProgress && progressEvent.total) {
-            const pct = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            onProgress(pct);
+    const { data } = await api.post<ImageUploadResponse>("/images/upload", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: onProgress
+        ? (e) => {
+            if (e.total) onProgress(Math.round((e.loaded / e.total) * 100));
           }
-        },
-      },
-    );
+        : undefined,
+    });
     return data;
   },
 
-  /**
-   * GET /api/v1/images/{id}
-   * Returns full image metadata including current processing status.
-   * Call this to poll until status === "ready".
-   */
-  async get(imageId: number): Promise<ImageResponse> {
-    const { data } = await api.get<ImageResponse>(`/images/${imageId}`);
-    return data;
-  },
-
-  /**
-   * GET /api/v1/images
-   * Returns a paginated list of images for the current user.
-   *
-   * @param params.evidence_type — filter to one type (optional)
-   * @param params.page          — 1-based page number (default 1)
-   * @param params.limit         — records per page (default 20)
-   */
+  /** List images with optional filter + pagination. */
   async list(params?: {
     evidence_type?: EvidenceType;
     page?:          number;
@@ -194,84 +174,88 @@ export const imageService = {
     return data;
   },
 
-  /**
-   * DELETE /api/v1/images/{id}
-   * Permanently removes the image, its enhanced copy, and its embedding.
-   */
-  async delete(imageId: number): Promise<void> {
-    await api.delete(`/images/${imageId}`);
-  },
-  /**
-   * GET /api/v1/images/{id}/comparison
-   *
-   * Returns the original uploaded image AND the preprocessed (enhanced)
-   * version as base64 data URIs for side-by-side display.
-   *
-   * The enhanced field is null when:
-   *   - Preprocessing has not completed yet
-   *   - Image processing failed
-   *
-   * Both data fields are ready to use directly as <img src={...} />.
-   * No additional fetch needed — the bytes are embedded in the response.
-   */
-  async getComparison(imageId: number): Promise<ComparisonResponse> {
-    const { data } = await api.get<ComparisonResponse>(
-      `/images/${imageId}/comparison`,
-    );
+  /** Get single image metadata. */
+  async get(imageId: number): Promise<ImageResponse> {
+    const { data } = await api.get<ImageResponse>(`/images/${imageId}`);
     return data;
   },
 
+  /** Delete an image. */
+  async delete(imageId: number): Promise<void> {
+    await api.delete(`/images/${imageId}`);
+  },
+
+  /** Get original vs enhanced base64 images for side-by-side view. */
+  async getComparison(imageId: number): Promise<ComparisonResponse> {
+    const { data } = await api.get<ComparisonResponse>(`/images/${imageId}/comparison`);
+    return data;
+  },
+
+  // ── Similarity comparisons ─────────────────────────────────────────────────
+
+  /** Compare two images by ID. */
+  async compare(imageAId: number, imageBId: number): Promise<SimilarityResponse> {
+    const { data } = await api.post<SimilarityResponse>("/compare", {
+      image_a_id: imageAId,
+      image_b_id: imageBId,
+    });
+    return data;
+  },
+
+  /** List past comparison results, newest first. */
+  async listResults(params?: {
+    evidence_type?: EvidenceType;
+    page?:          number;
+    limit?:         number;
+  }): Promise<SimilarityListResponse> {
+    const { data } = await api.get<SimilarityListResponse>("/compare", { params });
+    return data;
+  },
+
+  /** Get a single comparison result by ID. */
+  async getResult(resultId: number): Promise<SimilarityResponse> {
+    const { data } = await api.get<SimilarityResponse>(`/compare/${resultId}`);
+    return data;
+  },
 
   /**
-   * Polls GET /images/{id} at a fixed interval until status === "ready"
-   * or status === "failed", or the timeout is exceeded.
+   * Search the entire database for images similar to a single query image.
+   * The backend ranks all stored embeddings of the same evidence type
+   * and returns candidates ordered by similarity (highest first).
    *
-   * @param imageId    — ID returned by upload()
-   * @param onStatus   — called on every poll with the current status
-   * @param intervalMs — polling interval in ms (default 2 000)
-   * @param timeoutMs  — give up after this many ms (default 120 000)
-   *
-   * @returns Promise that resolves with the final ImageResponse when ready,
-   *          or rejects with an Error on failure / timeout.
+   * POST /compare/search   { image_id, top_k?, threshold? }
    */
-  pollUntilReady(
-    imageId:     number,
-    onStatus?:   (status: ImageStatus) => void,
-    intervalMs = 2_000,
+  async searchDatabase(params: {
+    image_id:   number;
+    top_k?:     number;    // how many candidates to return (default: 10)
+    threshold?: number;    // minimum similarity % to include (default: 0)
+  }): Promise<DatabaseSearchResponse> {
+    const { data } = await api.post<DatabaseSearchResponse>("/compare/search", params);
+    return data;
+  },
+
+  /** Poll GET /images/{id} until status reaches a terminal state. */
+  async pollUntilReady(
+    imageId:      number,
+    onStatusChange?: (status: ImageStatus) => void,
+    intervalMs = 2000,
     timeoutMs  = 120_000,
   ): Promise<ImageResponse> {
+    const terminal = new Set<ImageStatus>(["ready", "failed", "preprocessed"]);
     const deadline = Date.now() + timeoutMs;
 
-    return new Promise<ImageResponse>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const tick = async () => {
         try {
-          const image = await imageService.get(imageId);
-          onStatus?.(image.status);
-
-          if (image.status === "ready") {
-            resolve(image);
-          } else if (image.status === "failed") {
-            reject(
-              new Error(
-                `Processing failed for image ${imageId}. ` +
-                `Please re-upload the image.`,
-              )
-            );
-          } else if (Date.now() > deadline) {
-            reject(
-              new Error(
-                `Processing timed out for image ${imageId} after ` +
-                `${timeoutMs / 1000}s.`,
-              )
-            );
-          } else {
-            setTimeout(tick, intervalMs);
-          }
+          const img = await imageService.get(imageId);
+          onStatusChange?.(img.status);
+          if (terminal.has(img.status)) { resolve(img); return; }
+          if (Date.now() >= deadline)   { reject(new Error("Polling timed out")); return; }
+          setTimeout(tick, intervalMs);
         } catch (err) {
           reject(err);
         }
       };
-
       tick();
     });
   },
