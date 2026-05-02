@@ -204,7 +204,7 @@ export default function UploadPage() {
             <div className="space-y-1.5">
               <label className="field-label">Evidence type</label>
               <select
-
+                aria-label="Evidence type filter"
                 value={filterType}
                 onChange={(e) => handleFilterType(e.target.value as EvidenceType | "")}
                 className="field"
@@ -219,6 +219,7 @@ export default function UploadPage() {
             <div className="space-y-1.5">
               <label className="field-label">Status</label>
               <select
+                aria-label="Status filter"
                 value={filterStatus}
                 onChange={(e) => handleFilterStatus(e.target.value as ImageStatus | "")}
                 className="field"

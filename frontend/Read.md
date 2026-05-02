@@ -56,6 +56,7 @@ frontend/
 │       ├── feedback.tsx
 │       ├── admin.tsx
 │       └── change-password.tsx
+|       └──cases.tsx
 
 
 ## Run with

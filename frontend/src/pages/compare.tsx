@@ -360,6 +360,7 @@ function DatabaseSearchPanel() {
               </p>
             ) : (
               <select
+                aria-label="Select an image to search with"
                 value={selectedId}
                 onChange={(e) =>
                   setSelectedId(e.target.value === "" ? "" : Number(e.target.value))
@@ -383,6 +384,7 @@ function DatabaseSearchPanel() {
               <span className="text-gray-600 font-normal">(max candidates)</span>
             </label>
             <select
+              aria-label="Select how many top candidates to return"
               value={topK}
               onChange={(e) => setTopK(Number(e.target.value))}
               className="field"
@@ -403,6 +405,7 @@ function DatabaseSearchPanel() {
             </span>
           </div>
           <input
+          aria-label="Set minimum similarity threshold for search results"
             type="range"
             min={0} max={95} step={5}
             value={threshold}
@@ -585,6 +588,7 @@ function PastResultsPanel() {
         <div className="space-y-1.5">
           <label className="field-label">Filter by type</label>
           <select
+          aria-label="Filter results by evidence type"
             value={filterType}
             onChange={(e) => {
               setFilterType(e.target.value as EvidenceType | "");

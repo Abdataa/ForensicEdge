@@ -12,7 +12,7 @@
  *   requiredRole="admin" on AppLayout redirects non-admins to /dashboard
  *   before this component renders. The server enforces the same rules.
  */
-
+import Modal from "../components/ui/modal";
 import {
   useState,
   useEffect,
@@ -31,6 +31,9 @@ import {
   Activity,
   ScrollText,
   RefreshCw,
+  Pencil,
+  Eye,
+  KeyRound,
 } from "lucide-react";
 import toast  from "react-hot-toast";
 import clsx   from "clsx";
@@ -100,8 +103,9 @@ interface AuditLogsResponse {
   total: number;
   page:  number;
   limit: number;
-  pages: number;
-}
+  pages:number;
+  }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -323,6 +327,13 @@ function UsersPanel() {
   const [users,      setUsers]      = useState<User[]>([]);
   const [total,      setTotal]      = useState(0);
   const [loading,    setLoading]    = useState(true);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFullName, setEditFullName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRole, setEditRole] = useState<User["role"]>("analyst");
+  const [editPassword, setEditPassword] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const [showForm,   setShowForm]   = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
@@ -333,23 +344,51 @@ function UsersPanel() {
   const [role,      setRole]      = useState<User["role"]>("analyst");
   const [creating,  setCreating]  = useState(false);
   const [formError, setFormError] = useState("");
+  //new section-added
+  const [roleFilter,   setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get<UserListResponse>("/admin/users", {
-        params: { limit: 100 },
-      });
-      setUsers(data.users);
-      setTotal(data.total);
-    } catch {
-      toast.error("Could not load users.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+//new
+  const openEditModal = (user: User) => {
+  setSelectedUser(user);
 
-  useEffect(() => { loadUsers(); }, [loadUsers]);
+  setEditFullName(user.full_name);
+  setEditEmail(user.email);
+  setEditRole(user.role);
+
+  setEditPassword("");
+
+  setShowEditModal(true);
+};
+
+//new
+// ...existing code...
+const loadUsers = useCallback(async () => {
+  setLoading(true);
+  try {
+    const { data } = await api.get<UserListResponse>("/admin/users", {
+      params: {
+        limit: 100,
+        ...(roleFilter && { role: roleFilter }),
+        ...(statusFilter !== "" && {
+          is_active: statusFilter === "active",
+        }),
+      },
+    });
+    setUsers(data.users);
+    setTotal(data.total);
+  } catch {
+    toast.error("Could not load users.");
+  } finally {
+    setLoading(false);
+  }
+}, [roleFilter, statusFilter]);
+
+useEffect(() => {
+  loadUsers();
+}, [loadUsers]);
+// ...existing code...
+
 
   const handleToggleActive = async (user: User) => {
     setTogglingId(user.id);
@@ -384,6 +423,40 @@ function UsersPanel() {
       setDeletingId(null);
     }
   };
+  // new update handler
+  const handleUpdateUser = async () => {
+  if (!selectedUser) return;
+
+  setSavingEdit(true);
+
+  try {
+    const payload: Record<string, unknown> = {
+      full_name: editFullName.trim(),
+      email: editEmail.trim(),
+      role: editRole,
+    };
+
+    if (editPassword.trim()) {
+      payload.password = editPassword.trim();
+    }
+
+    await api.patch(`/admin/users/${selectedUser.id}`, payload);
+
+    toast.success("User updated successfully.");
+
+    setShowEditModal(false);
+
+    await loadUsers();
+  } catch (err: unknown) {
+    const detail =
+      (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail ?? "Update failed.";
+
+    toast.error(detail);
+  } finally {
+    setSavingEdit(false);
+  }
+};
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -410,6 +483,7 @@ function UsersPanel() {
   };
 
   return (
+    <>
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-end justify-between flex-wrap gap-3">
@@ -470,6 +544,57 @@ function UsersPanel() {
         </Card>
       )}
 
+      <Card>
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+    {/* Role Filter */}
+    <div className="space-y-1.5">
+      <label className="field-label">Role</label>
+      <select
+       aria-label="Field Label"
+        value={roleFilter}
+        onChange={(e) => setRoleFilter(e.target.value)}
+        className="field"
+      >
+        <option value="">All roles</option>
+        <option value="admin">Admin</option>
+        <option value="analyst">Analyst</option>
+        <option value="ai_engineer">AI Engineer</option>
+      </select>
+    </div>
+
+    {/* Status Filter */}
+    <div className="space-y-1.5">
+      <label className="field-label">Status</label>
+      <select
+        aria-label="Filter by account status"
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+        className="field"
+      >
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+
+    {/* Clear */}
+    <div className="flex items-end">
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => {
+          setRoleFilter("");
+          setStatusFilter("");
+        }}
+      >
+        Clear filters
+      </Button>
+    </div>
+  </div>
+</Card>
+
+
       {/* Table */}
       {loading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" /></div>
@@ -521,6 +646,14 @@ function UsersPanel() {
                             : user.is_active ? <UserX size={15} /> : <UserCheck size={15} />}
                         </button>
                         <button
+                          onClick={() => openEditModal(user)}
+                          title="Edit user"
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-blue-400 hover:bg-gray-800 transition-colors"
+                           >
+                          <Pencil size={15} />
+                        </button>
+
+                        <button
                           onClick={() => handleDelete(user)}
                           disabled={deletingId === user.id}
                           title="Delete user permanently"
@@ -538,8 +671,78 @@ function UsersPanel() {
         </Card>
       )}
     </div>
+     <Modal
+      open={showEditModal}
+      onClose={() => setShowEditModal(false)}
+      title="Edit User"
+      maxWidth="max-w-lg"
+    >
+      <div className="space-y-4">
+
+        <Input
+          label="Full name"
+          value={editFullName}
+          onChange={(e) => setEditFullName(e.target.value)}
+        />
+
+        <Input
+          label="Email"
+          type="email"
+          value={editEmail}
+          onChange={(e) => setEditEmail(e.target.value)}
+        />
+
+        <div className="space-y-1.5">
+          <label className="field-label">Role</label>
+
+          <select
+            aria-label="Field Label"
+            value={editRole}
+            onChange={(e) =>
+              setEditRole(e.target.value as User["role"])
+            }
+            className="field"
+          >
+            <option value="analyst">Analyst</option>
+            <option value="admin">Admin</option>
+            <option value="ai_engineer">AI Engineer</option>
+          </select>
+        </div>
+
+        <Input
+          label="Reset password (optional)"
+          type="password"
+          value={editPassword}
+          onChange={(e) => setEditPassword(e.target.value)}
+          placeholder="Leave blank to keep current password"
+        />
+
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <Button
+            variant="secondary"
+            onClick={() => setShowEditModal(false)}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            loading={savingEdit}
+            onClick={handleUpdateUser}
+          >
+            Save changes
+          </Button>
+        </div>
+
+      </div>
+    </Modal>
+  </>
+
   );
 }
+
+
+
+
 
 // ── 2. System Health panel ───────────────────────────────────────────────────
 
