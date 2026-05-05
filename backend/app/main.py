@@ -48,6 +48,7 @@ from app.api.routes_admin    import router as admin_router
 from app.api.routes_logs     import router as logs_router
 from app.api.routes_feedback import router as feedback_router
 from app.api.routes_cases    import router as cases_router
+from app.api.routes_ml import router as ml_router
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +169,7 @@ app.include_router(admin_router,    prefix=PREFIX)
 app.include_router(logs_router,     prefix=PREFIX)
 app.include_router(feedback_router, prefix=PREFIX)
 app.include_router(cases_router,    prefix=PREFIX)
+app.include_router(ml_router,       prefix=PREFIX)
 
 
 # ---------------------------------------------------------------------------

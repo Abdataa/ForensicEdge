@@ -47,6 +47,7 @@ Usage examples
     user: User         = Depends(get_current_active_user)
 """
 
+
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -252,6 +253,22 @@ CurrentUser = Annotated[User, Depends(get_current_active_user)]
 
 # Admin only
 AdminUser = Annotated[User, Depends(require_role(UserRole.ADMIN))]
+async def get_ml_user(
+        current_user: User = Depends(get_current_user),
+    ) -> User:
+        if current_user.role not in ("admin", "ai_engineer"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="AI Engineer or Admin access required.",
+            )
+        if not current_user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is deactivated.",
+            )
+        return current_user
+
+MlUser = Annotated[User, Depends(get_ml_user)]
 
 # Admin or AI engineer
 AIOrAdminUser = Annotated[

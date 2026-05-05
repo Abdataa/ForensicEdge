@@ -56,7 +56,7 @@ from app.schemas.user_schema import (
     UserResponse,
     UserListResponse,
 )
-from app.schemas.audit.case_audit_schema import (
+from app.schemas.audit.case_events import (
     CaseCreatedDetails,
     CaseUpdatedDetails,
     CaseDeletedDetails,
