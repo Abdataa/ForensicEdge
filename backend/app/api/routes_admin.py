@@ -56,8 +56,18 @@ from app.schemas.user_schema import (
     UserResponse,
     UserListResponse,
 )
+from app.schemas.audit.case_audit_schema import (
+    CaseCreatedDetails,
+    CaseUpdatedDetails,
+    CaseDeletedDetails,
+    CaseEvidenceLinkedDetails,
+    CaseAnalysisLinkedDetails,
+    CaseReportLinkedDetails,
+    CaseNoteAddedDetails,
+)
 from app.services               import auth_service
 from app.services.log_service   import create_log, list_logs
+
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 
@@ -212,15 +222,48 @@ def _audit_to_activity(log_row: Any, idx: int) -> ActivityEvent:
     # Enrich description from details payload
     desc_parts: list[str] = [base_desc]
 
-    filename = details.get("filename") or details.get("original_filename")
+    #filename = details.get("filename") or details.get("original_filename")
+    filename: Optional[str] = None
+    case_id_val: Optional[str] = None
+
+    try:
+        if log_row.action_type == "case_created":
+            parsed = CaseCreatedDetails(**details)
+            case_id_val = parsed.case_id
+
+        elif log_row.action_type == "case_updated":
+            parsed = CaseUpdatedDetails(**details)
+            case_id_val = parsed.case_id
+
+        elif log_row.action_type == "case_deleted":
+            parsed = CaseDeletedDetails(**details)
+            case_id_val = parsed.case_id
+
+        elif log_row.action_type == "case_evidence_linked":
+            parsed = CaseEvidenceLinkedDetails(**details)
+            case_id_val = parsed.case_id
+
+        elif log_row.action_type == "case_analysis_linked":
+            parsed = CaseAnalysisLinkedDetails(**details)
+            case_id_val = parsed.case_id
+
+        elif log_row.action_type == "case_report_linked":
+            parsed = CaseReportLinkedDetails(**details)
+            case_id_val = parsed.case_id
+
+        elif log_row.action_type == "case_note_added":
+            parsed = CaseNoteAddedDetails(**details)
+            case_id_val = parsed.case_id
+
+    except Exception:
+        # malformed audit payload — don't crash admin timeline
+        pass
+
+
     if filename:
         desc_parts.append(f"— {filename}")
 
-    case_id_val: Optional[str] = (
-        details.get("case_id")
-        or details.get("case_number")
-        or None
-    )
+
     if case_id_val:
         case_id_val = str(case_id_val)
 

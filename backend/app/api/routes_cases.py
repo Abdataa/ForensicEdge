@@ -365,3 +365,31 @@ async def list_notes(
         user    = current_user,
         db      = db,
     )
+
+@router.post(
+    "/{case_id}/analyze",
+    response_model=CaseAnalysisResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Run analysis inside case",
+)
+async def run_case_analysis(
+    case_id: int,
+    # You would need a new schema like CaseAnalyzeRequest for these IDs
+    image_a_id: int,
+    image_b_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Triggers a comparison between two images, saves the result,
+    and automatically links it to this case in one transaction.
+    """
+    return await case_service.run_case_analysis(
+        case_id=case_id,
+        image_a_id=image_a_id,
+        image_b_id=image_b_id,
+        user=current_user,
+        db=db,
+        ip_address=request.client.host if request.client else None,
+    )

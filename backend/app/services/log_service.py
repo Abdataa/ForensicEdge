@@ -24,6 +24,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_log import AuditLog
+from app.schemas.audit import AUDIT_EVENT_SCHEMAS
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +64,10 @@ async def create_log(
             ip_address  = request.client.host,
         )
     """
+    schema = AUDIT_EVENT_SCHEMAS.get(action_type)
+
+    if schema and details is not None:
+         details = schema.model_validate(details).model_dump()
     log = AuditLog(
         action_type = action_type,
         user_id     = user_id,
