@@ -1,46 +1,24 @@
-
-/** *
- *updated script with side-by-side original vs enhanced comparison modal and delete functionality.
- * ──────────────────────
+/**
  * src/pages/upload.tsx
  * ──────────────────────
  * Evidence image upload page.
  *
- * Layout
- * ───────
- *   Evidence type selector (fingerprint | toolmark)
- *   Drop zone uploader — validates, uploads, preprocesses, embeds
- *   Recent uploads table (last 10)
- *
- * Flow
- * ─────
- *   1. Investigator selects evidence type
- *   2. Investigator drops or browses to an image file
- *   3. ImageUploader posts file to POST /images/upload
- *   4. ImageUploader polls GET /images/{id} until status=ready
- *   5. onComplete fires → prepends the new image to the recent list
- *
- * Recent uploads
- * ───────────────
- * Loaded on mount via imageService.list({ limit: 10 }).
- * When a new upload completes it is prepended in state without
- * re-fetching — keeps the table consistent with what was just uploaded.
- * User can refresh the page to get the full latest list.
- * * ──────────────────────
- * Evidence image upload page.
- * After each upload completes, the investigator can open a
- * side-by-side original vs enhanced comparison directly on this page.
- * Delete
- * ───────
- * Each row has a delete button.
- * Calls imageService.delete(id) then removes the row from state.
- * Shows a confirmation toast on success / error.
+ * What changed vs the previous version
+ * ──────────────────────────────────────
+ *   • Image list now shows ALL images (not just last 10)
+ *     via GET /images?evidence_type=&page=&limit=
+ *   • Evidence-type filter on the recent-uploads table
+ *   • Full pagination on the image list
+ *   • Status filter (all / ready / failed / etc.)
+ *   • Original side-by-side comparison modal (unchanged)
+ *   • Delete (unchanged)
  */
 
-import { useState, useEffect } from "react";
-import Head    from "next/head";
-import { Trash2, Upload as UploadIcon, Eye } from "lucide-react";
-import toast   from "react-hot-toast";
+import { useState, useEffect, useCallback } from "react";
+import Head   from "next/head";
+import { Trash2, Upload as UploadIcon, Eye, RefreshCw } from "lucide-react";
+import toast  from "react-hot-toast";
+import clsx   from "clsx";
 
 import AppLayout            from "../components/layout/AppLayout";
 import Card                 from "../components/ui/Card";
@@ -56,40 +34,109 @@ import {
   imageService,
   ImageResponse,
   EvidenceType,
+  ImageStatus,
   ComparisonResponse,
 } from "../services/imageService";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LIST_LIMIT = 15;
+
+const ALL_STATUSES: { value: ImageStatus | ""; label: string }[] = [
+  { value: "",              label: "All statuses"  },
+  { value: "ready",         label: "Ready"         },
+  { value: "preprocessed",  label: "Preprocessed"  },
+  { value: "preprocessing", label: "Preprocessing" },
+  { value: "extracting",    label: "Extracting"    },
+  { value: "failed",        label: "Failed"        },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function UploadPage() {
+  // ── Upload section state ──────────────────────────────────────────────────
   const [evidenceType, setEvidenceType] = useState<EvidenceType>("fingerprint");
-  const [recentImages, setRecentImages] = useState<ImageResponse[]>([]);
+
+  // ── Image list state ──────────────────────────────────────────────────────
+  const [images,       setImages]       = useState<ImageResponse[]>([]);
+  const [total,        setTotal]        = useState(0);
+  const [page,         setPage]         = useState(1);
   const [loadingList,  setLoadingList]  = useState(true);
   const [deletingId,   setDeletingId]   = useState<number | null>(null);
 
-  // Comparison modal state
+  // Filters
+  const [filterType,   setFilterType]   = useState<EvidenceType | "">("");
+  const [filterStatus, setFilterStatus] = useState<ImageStatus | "">("");
+
+  // ── Comparison modal state ────────────────────────────────────────────────
   const [comparisonOpen,  setComparisonOpen]  = useState(false);
   const [comparisonData,  setComparisonData]  = useState<ComparisonResponse | null>(null);
   const [comparisonLoad,  setComparisonLoad]  = useState(false);
   const [comparisonTitle, setComparisonTitle] = useState("");
 
-  // Load recent uploads on mount
-  useEffect(() => {
-    imageService
-      .list({ limit: 10 })
-      .then((res) => setRecentImages(res.images))
-      .catch(() => toast.error("Could not load recent uploads."))
-      .finally(() => setLoadingList(false));
+  const pages = Math.max(1, Math.ceil(total / LIST_LIMIT));
+
+  // ── Fetch image list ──────────────────────────────────────────────────────
+  const loadImages = useCallback(async (
+    pg:  number,
+    et:  EvidenceType | "",
+    st:  ImageStatus  | "",
+  ) => {
+    setLoadingList(true);
+    try {
+      const res = await imageService.list({
+        page:          pg,
+        limit:         LIST_LIMIT,
+        evidence_type: et  || undefined,
+      });
+
+      // Status is not a backend filter param — filter client-side
+      const filtered = st
+        ? res.images.filter((i) => i.status === st)
+        : res.images;
+
+      setImages(filtered);
+      setTotal(st ? filtered.length : res.total);
+    } catch {
+      toast.error("Could not load images.");
+    } finally {
+      setLoadingList(false);
+    }
   }, []);
 
-  const handleUploadComplete = (image: ImageResponse) => {
-    setRecentImages((prev) => [image, ...prev.slice(0, 9)]);
+  useEffect(() => {
+    loadImages(page, filterType, filterStatus);
+  }, [page, filterType, filterStatus, loadImages]);
+
+  // When a filter changes, reset to page 1
+  const handleFilterType = (v: EvidenceType | "") => {
+    setFilterType(v);
+    setPage(1);
+  };
+  const handleFilterStatus = (v: ImageStatus | "") => {
+    setFilterStatus(v);
+    setPage(1);
   };
 
+  // ── Upload callback ───────────────────────────────────────────────────────
+  const handleUploadComplete = (image: ImageResponse) => {
+    // Prepend to list; re-fetch to keep counts accurate
+    loadImages(1, filterType, filterStatus);
+    setPage(1);
+  };
+
+  // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async (image: ImageResponse) => {
     if (!confirm(`Delete "${image.original_filename}"? This cannot be undone.`)) return;
     setDeletingId(image.id);
     try {
       await imageService.delete(image.id);
-      setRecentImages((prev) => prev.filter((i) => i.id !== image.id));
+      setImages((prev) => prev.filter((i) => i.id !== image.id));
+      setTotal((t) => t - 1);
       toast.success("Image deleted.");
     } catch {
       toast.error("Delete failed. Please try again.");
@@ -98,7 +145,7 @@ export default function UploadPage() {
     }
   };
 
-  // Open the original vs enhanced comparison modal for a given image
+  // ── Comparison modal ──────────────────────────────────────────────────────
   const handleViewComparison = async (image: ImageResponse) => {
     setComparisonTitle(image.original_filename);
     setComparisonData(null);
@@ -115,10 +162,11 @@ export default function UploadPage() {
     }
   };
 
-  // Determine whether comparison is viewable
-  // Comparison is always available — shows "pending" state if not yet enhanced
-  const canCompare = (img: ImageResponse) =>
-    img.status !== "uploaded";  // at minimum preprocessing has started
+  const canCompare = (img: ImageResponse) => img.status !== "uploaded";
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -126,7 +174,7 @@ export default function UploadPage() {
 
       <AppLayout title="Upload Evidence">
 
-        {/* Evidence type selector */}
+        {/* ── Evidence type selector ── */}
         <Card>
           <EvidenceTypeSelector
             value={evidenceType}
@@ -134,7 +182,7 @@ export default function UploadPage() {
           />
         </Card>
 
-        {/* Uploader */}
+        {/* ── Uploader ── */}
         <Card title="Upload Image">
           <ImageUploader
             evidenceType={evidenceType}
@@ -147,21 +195,74 @@ export default function UploadPage() {
           </p>
         </Card>
 
-        {/* Recent uploads table */}
-        <Card title="Recent Uploads" padding="p-0">
+        {/* ── Image list with filter + pagination ── */}
+        <Card title="Uploaded Images" padding="p-0">
+
+          {/* Filter bar */}
+          <div className="flex flex-wrap items-end gap-3 px-4 pt-4 pb-3 border-b border-gray-800">
+            {/* Evidence type filter */}
+            <div className="space-y-1.5">
+              <label className="field-label">Evidence type</label>
+              <select
+                aria-label="Evidence type filter"
+                value={filterType}
+                onChange={(e) => handleFilterType(e.target.value as EvidenceType | "")}
+                className="field"
+              >
+                <option value="">All types</option>
+                <option value="fingerprint">Fingerprint</option>
+                <option value="toolmark">Toolmark</option>
+              </select>
+            </div>
+
+            {/* Status filter */}
+            <div className="space-y-1.5">
+              <label className="field-label">Status</label>
+              <select
+                aria-label="Status filter"
+                value={filterStatus}
+                onChange={(e) => handleFilterStatus(e.target.value as ImageStatus | "")}
+                className="field"
+              >
+                {ALL_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Refresh + count */}
+            <div className="ml-auto flex items-center gap-3 self-end">
+              <span className="text-xs text-gray-600">
+                {loadingList ? "Loading…" : `${total} image${total !== 1 ? "s" : ""}`}
+              </span>
+              <button
+                onClick={() => loadImages(page, filterType, filterStatus)}
+                disabled={loadingList}
+                className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-colors disabled:opacity-40"
+                title="Refresh"
+              >
+                <RefreshCw size={14} className={loadingList ? "animate-spin" : ""} />
+              </button>
+            </div>
+          </div>
+
+          {/* Table body */}
           {loadingList ? (
             <div className="flex justify-center py-10">
               <Spinner size="md" />
             </div>
 
-          ) : recentImages.length === 0 ? (
+          ) : images.length === 0 ? (
             <div className="text-center py-12 space-y-3 px-6">
-              <div className="w-14 h-14 rounded-2xl bg-gray-800 flex items-center
-                              justify-center mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-gray-800 flex items-center justify-center mx-auto">
                 <UploadIcon size={24} className="text-gray-600" />
               </div>
-              <p className="text-gray-500 text-sm">No images uploaded yet.</p>
-              <p className="text-gray-600 text-xs">Upload an image above to get started.</p>
+              <p className="text-gray-500 text-sm">
+                {filterType || filterStatus ? "No images match your filters." : "No images uploaded yet."}
+              </p>
+              {!(filterType || filterStatus) && (
+                <p className="text-gray-600 text-xs">Upload an image above to get started.</p>
+              )}
             </div>
 
           ) : (
@@ -179,7 +280,7 @@ export default function UploadPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentImages.map((img) => (
+                  {images.map((img) => (
                     <tr key={img.id}>
 
                       {/* Filename */}
@@ -193,18 +294,14 @@ export default function UploadPage() {
                         <span className="text-gray-600 text-xs">ID: {img.id}</span>
                       </td>
 
-                      {/* Evidence type */}
                       <td><EvidenceBadge type={img.evidence_type} /></td>
 
-                      {/* Size */}
                       <td className="text-gray-400 whitespace-nowrap text-xs">
                         {(img.file_size_bytes / 1024).toFixed(1)} KB
                       </td>
 
-                      {/* Processing status */}
                       <td><StatusBadge status={img.status} /></td>
 
-                      {/* Upload date */}
                       <td className="text-gray-500 text-xs whitespace-nowrap">
                         {new Date(img.upload_date).toLocaleString(undefined, {
                           month: "short", day: "numeric",
@@ -212,7 +309,7 @@ export default function UploadPage() {
                         })}
                       </td>
 
-                      {/* View original vs enhanced button */}
+                      {/* View original vs enhanced */}
                       <td>
                         <Button
                           variant="secondary"
@@ -242,18 +339,65 @@ export default function UploadPage() {
                           className="text-gray-600 hover:text-red-400"
                         />
                       </td>
-
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+
+          {/* Pagination footer */}
+          {pages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800">
+              <span className="text-xs text-gray-500">
+                Page {page} of {pages}
+              </span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded-lg text-xs border border-gray-800
+                             text-gray-500 hover:text-white hover:border-gray-600
+                             disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  ← Prev
+                </button>
+                {Array.from({ length: Math.min(pages, 7) }, (_, i) => {
+                  const lo = Math.max(1, page - 3);
+                  return lo + i;
+                })
+                  .filter((p) => p <= pages)
+                  .map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={clsx(
+                        "px-3 py-1.5 rounded-lg text-xs border transition-colors",
+                        p === page
+                          ? "border-gray-600 bg-gray-800 text-white font-medium"
+                          : "border-gray-800 text-gray-500 hover:text-white hover:border-gray-600"
+                      )}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                <button
+                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                  disabled={page === pages}
+                  className="px-3 py-1.5 rounded-lg text-xs border border-gray-800
+                             text-gray-500 hover:text-white hover:border-gray-600
+                             disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
 
       </AppLayout>
 
-      {/* ── Original vs Enhanced modal ───────────────────────────────────── */}
+      {/* ── Original vs Enhanced modal ── */}
       <Modal
         open={comparisonOpen}
         onClose={() => setComparisonOpen(false)}
@@ -266,14 +410,9 @@ export default function UploadPage() {
             <p className="text-gray-400 text-sm">Loading image data…</p>
           </div>
         ) : comparisonData ? (
-          <ImageComparison
-            data={comparisonData}
-            modal
-          />
+          <ImageComparison data={comparisonData} modal />
         ) : null}
       </Modal>
     </>
   );
 }
-
-

@@ -22,14 +22,16 @@ Pipeline
     6. Audit log
     7. Return SimilarityResponse
 """
-
+import logging
 from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 import torch
+import torch.nn.functional as F
 
 from app.models.forensic_image   import ForensicImage, FeatureSet
 from app.models.similarity_result import SimilarityResult
@@ -39,13 +41,17 @@ from app.schemas.similarity_schema import (
     SimilarityResponse,
     SimilarityListResponse,
     ImageSummary,
+    DatabaseSearchRequest,
+    DatabaseSearchResponse,
+    SearchCandidate,
+
 )
 from app.services.log_service import create_log
 
 from ai_engine.inference.compare  import get_engine
 from app.services.image_service import _weights_path_for
 
-
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 async def compare(
@@ -333,4 +339,160 @@ def _build_response(
         requested_by           = result.requested_by,
         image_1 = ImageSummary.model_validate(image_1) if image_1 else None,
         image_2 = ImageSummary.model_validate(image_2) if image_2 else None,
+    )
+
+
+# Thresholds — must match those in compare() for consistency
+MATCH_THRESHOLD          = 80.0   # % → MATCH
+POSSIBLE_MATCH_THRESHOLD = 60.0   # % → POSSIBLE MATCH
+
+
+def _pct_to_status(pct: float) -> str:
+    if pct >= MATCH_THRESHOLD:
+        return "MATCH"
+    if pct >= POSSIBLE_MATCH_THRESHOLD:
+        return "POSSIBLE MATCH"
+    return "NO MATCH"
+
+
+async def search_database(
+    payload:    DatabaseSearchRequest,
+    user:       User,
+    db:         AsyncSession,
+    ip_address: Optional[str] = None,
+) -> DatabaseSearchResponse:
+    """
+    Rank all stored images of the same evidence type by similarity
+    to the query image and return the top-k candidates.
+
+    Steps
+    -----
+    1. Load the query image + its FeatureSet (must be 'ready').
+    2. Load all OTHER images of the same evidence type that have a FeatureSet.
+    3. Compute cosine similarity + euclidean distance for each candidate.
+    4. Filter by threshold, sort descending, return top_k.
+    5. Write an audit log entry.
+    """
+    # ── 1. Load query image ──────────────────────────────────────────────────
+    q_result = await db.execute(
+        select(ForensicImage)
+        .options(selectinload(ForensicImage.feature_set))
+        .where(ForensicImage.id == payload.image_id)
+    )
+    query_img = q_result.scalar_one_or_none()
+
+    if query_img is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Image {payload.image_id} not found.",
+        )
+    if query_img.user_id != user.id and user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied.",
+        )
+    if query_img.status != "ready" or query_img.feature_set is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Image {payload.image_id} is not ready for comparison "
+                f"(status={query_img.status}). "
+                "Wait for embedding extraction to complete."
+            ),
+        )
+
+    query_vector = torch.tensor(query_img.feature_set.feature_vector, dtype=torch.float32)
+
+    # ── 2. Load all candidate images of the same evidence type ───────────────
+    # Admins search across all users; regular users only search their own images.
+    cand_query = (
+        select(ForensicImage)
+        .options(selectinload(ForensicImage.feature_set))
+        .where(
+            ForensicImage.evidence_type == query_img.evidence_type,
+            ForensicImage.status        == "ready",
+            ForensicImage.id            != payload.image_id,   # exclude self
+        )
+    )
+    if user.role != "admin":
+        cand_query = cand_query.where(ForensicImage.user_id == user.id)
+
+    cand_result = await db.execute(cand_query)
+    candidates  = [img for img in cand_result.scalars().all() if img.feature_set is not None]
+
+    total_searched = len(candidates)
+    logger.info(
+        f"Database search: query_image={payload.image_id}, "
+        f"evidence_type={query_img.evidence_type}, candidates={total_searched}"
+    )
+
+    # ── 3. Score each candidate ───────────────────────────────────────────────
+    scored: list[tuple[float, float, float, ForensicImage]] = []
+
+    for cand in candidates:
+        cand_vector = torch.tensor(cand.feature_set.feature_vector, dtype=torch.float32)
+
+        # Cosine similarity — clamp to [-1, 1] to guard floating-point drift
+        cosine = float(
+            F.cosine_similarity(query_vector.unsqueeze(0), cand_vector.unsqueeze(0))
+            .clamp(-1.0, 1.0)
+            .item()
+        )
+
+        # Euclidean distance in normalised embedding space
+        euclidean = float(torch.dist(query_vector, cand_vector).item())
+
+        # Convert cosine similarity → 0–100 % (same formula as compare())
+        pct = round((cosine + 1.0) / 2.0 * 100.0, 2)
+
+        scored.append((pct, cosine, euclidean, cand))
+
+    # ── 4. Filter by threshold, sort, limit ──────────────────────────────────
+    filtered = [s for s in scored if s[0] >= payload.threshold]
+    filtered.sort(key=lambda x: x[0], reverse=True)
+    top      = filtered[: payload.top_k]
+
+    result_candidates = [
+        SearchCandidate(
+            image = ImageSummary(
+                id                = img.id,
+                original_filename = img.original_filename,
+                evidence_type     = img.evidence_type,
+                status            = img.status,
+                upload_date       = img.upload_date,
+            ),
+            similarity_percentage = pct,
+            match_status          = _pct_to_status(pct),
+            cosine_similarity     = cosine,
+            euclidean_distance    = euclidean,
+        )
+        for pct, cosine, euclidean, img in top
+    ]
+
+    # ── 5. Audit log ──────────────────────────────────────────────────────────
+    await create_log(
+        db          = db,
+        action_type = "database_search",
+        user_id     = user.id,
+        details     = {
+            "query_image_id": payload.image_id,
+            "evidence_type":  query_img.evidence_type,
+            "total_searched": total_searched,
+            "top_k":          payload.top_k,
+            "threshold":      payload.threshold,
+            "matches_found":  len(result_candidates),
+        },
+        ip_address  = ip_address,
+    )
+
+    return DatabaseSearchResponse(
+        query_image = ImageSummary(
+            id                = query_img.id,
+            original_filename = query_img.original_filename,
+            evidence_type     = query_img.evidence_type,
+            status            = query_img.status,
+            upload_date       = query_img.upload_date,
+        ),
+        total_searched = total_searched,
+        candidates     = result_candidates,
     )

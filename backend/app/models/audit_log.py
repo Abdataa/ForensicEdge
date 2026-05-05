@@ -84,7 +84,8 @@ ACTION_TYPE_ENUM = Enum(
     "case_analysis_linked",   # SimilarityResult attached to a Case
     "case_report_linked",     # Report attached to a Case
     "case_note_added",        # Investigator note posted in a Case
-
+   #database_search
+    "database_search",          # search entire database for similar images
     name="action_type",
 )
 

@@ -23,6 +23,7 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from typing import List
 
 
 # ---------------------------------------------------------------------------
@@ -129,3 +130,22 @@ class SimilarityListResponse(BaseModel):
     page:    int
     limit:   int
     results: list[SimilarityResponse]
+
+class DatabaseSearchRequest(BaseModel):
+    image_id:  int            = Field(...,  description="ID of the query image (must be ready)")
+    top_k:     int            = Field(10,   ge=1, le=50, description="Max candidates to return")
+    threshold: float          = Field(0.0,  ge=0, le=100, description="Minimum similarity %")
+
+
+class SearchCandidate(BaseModel):
+    image:                 ImageSummary   # reuse the existing ImageSummary schema
+    similarity_percentage: float
+    match_status:          str
+    cosine_similarity:     float
+    euclidean_distance:    float
+
+
+class DatabaseSearchResponse(BaseModel):
+    query_image:    ImageSummary
+    total_searched: int
+    candidates:     List[SearchCandidate]
