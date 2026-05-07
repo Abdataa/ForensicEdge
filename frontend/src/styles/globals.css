@@ -187,4 +187,7 @@
   .divider {
     @apply border-t border-gray-800 my-2;
   }
+  .select-filter {
+  @apply min-w-[160px];
+}
 }

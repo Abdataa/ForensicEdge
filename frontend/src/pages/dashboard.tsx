@@ -42,6 +42,7 @@ import { imageService }        from "../services/imageService";
 import { compareService, SimilarityResponse } from "../services/compareService";
 import { reportService }       from "../services/reportService";
 import api                     from "../services/api";
+import { mlService } from "../services/mlService";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ML-service types (inline — move to mlService.ts when backend is ready)
@@ -365,14 +366,14 @@ export function AiEngineerDashboard() {
             icon:  <Upload size={16} className="text-cyan-400" />,
             label: "Upload Dataset",
             desc:  "Add labelled images for training",
-            href:  "/ml/datasets/new",
+            href:  "/ml/datasets",
             bg:    "bg-cyan-950 hover:bg-cyan-900 border-cyan-900 hover:border-cyan-700",
           },
           {
             icon:  <Play size={16} className="text-purple-400" />,
             label: "Train Model",
             desc:  "Launch a new training run",
-            href:  "/ml/jobs/new",
+            href:  "/ml/jobs",
             bg:    "bg-purple-950 hover:bg-purple-900 border-purple-900 hover:border-purple-700",
           },
           {
@@ -415,7 +416,7 @@ export function AiEngineerDashboard() {
               <Cpu size={24} className="text-gray-700 mx-auto" />
               <p className="text-gray-600 text-sm">No training jobs yet.</p>
               <Button size="sm" icon={<Play size={13} />}
-                onClick={() => router.push("/ml/jobs/new")}>
+                onClick={() => router.push("/ml/jobs")}>
                 Start first run
               </Button>
             </div>
@@ -513,7 +514,7 @@ export function AiEngineerDashboard() {
             <Database size={24} className="text-gray-700 mx-auto" />
             <p className="text-gray-600 text-sm">No datasets uploaded yet.</p>
             <Button size="sm" icon={<Upload size={13} />}
-              onClick={() => router.push("/ml/datasets/new")}>
+              onClick={() => router.push("/ml/datasets")}>
               Upload dataset
             </Button>
           </div>
