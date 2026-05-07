@@ -1,4 +1,5 @@
 """
+backend/app/schemas/audit/auth_events.py
 Typed payload schemas for authentication-related audit events.
 """
 

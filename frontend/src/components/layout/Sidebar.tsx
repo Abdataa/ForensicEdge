@@ -33,6 +33,13 @@
 import Link       from "next/link";
 import { useRouter } from "next/router";
 import {
+  Database,
+  Cpu,
+  Layers,
+  FlaskConical,
+} from "lucide-react";
+
+import {
   LayoutDashboard,
   Upload,
   GitCompare,
@@ -107,6 +114,60 @@ const NAV_ITEMS: NavItem[] = [
     roles:  ["admin"],
 
   },
+  {
+    href:   "/api-keys",
+    label:  "API Keys",
+    icon:   <KeyRound size={18} />,
+    roles:  ["admin"],
+
+  },
+  {
+    href:   "/admin/ml",
+    label:  "ML Dashboard",
+    icon:   <Shield size={18} />,
+    roles:  ["admin"],
+  },
+  // ── AI ENGINEER ─────────────────────────────
+  {
+    href:  "/ml/datasets",
+    label: "Datasets",
+    icon:  <Database size={18} />,
+    roles: ["ai_engineer"],
+  },
+  {
+    href:  "/ml/jobs",
+    label: "Training Jobs",
+    icon:  <Cpu size={18} />,
+    roles: ["ai_engineer"],
+  },
+  {
+    href:  "/ml/models",
+    label: "Model Versions",
+    icon:  <Layers size={18} />,
+    roles: ["ai_engineer"],
+  },
+  {
+    href:  "/ml/evaluate",
+    label: "Evaluation",
+    icon:  <FlaskConical size={18} />,
+    roles: ["ai_engineer"],
+  },
+  // ── ADMIN (can also see ML) ─────────────────
+  {
+    href:  "/ml/datasets",
+    label: "ML Datasets",
+    icon:  <Database size={18} />,
+    roles: ["admin"],
+  },
+  {
+    href:  "/ml/jobs",
+    label: "ML Jobs",
+    icon:  <Cpu size={18} />,
+    roles: ["admin"],
+  },
+
+
+
 
 
 ];
@@ -190,7 +251,7 @@ export default function Sidebar() {
       {/* ── Navigation ───────────────────────────────────────────────────── */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {visibleItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname.startsWith(item.href);
 
           return (
             <Link

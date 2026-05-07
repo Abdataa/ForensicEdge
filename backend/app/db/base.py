@@ -15,6 +15,7 @@ Usage in database/migrations/env.py:
     from app.db.base import Base
     target_metadata = Base.metadata
 """
+from app.models.user       import User           # noqa: F401
 
 from app.core.database import Base  # noqa: F401  — re-export for Alembic
 
