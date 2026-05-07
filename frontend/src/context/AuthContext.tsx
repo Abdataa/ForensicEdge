@@ -84,6 +84,12 @@ interface AuthContextType {
    * (the server uses role-based guards, not hierarchy).
    */
   isAnalyst: () => boolean;
+
+    /**
+   * Re-fetch the current user from the backend
+   * and update the auth context + localStorage cache.
+   */
+  refreshUser: () => Promise<void>;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -164,6 +170,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
+  // ── refreshUser ──────────────────────────────────────────────────────────
+  const refreshUser = useCallback(async (): Promise<void> => {
+    try {
+      const fresh = await authService.getMe();
+
+      // Update React state
+      setUser(fresh);
+
+      // Update localStorage cache
+      TokenStorage.setUser(fresh);
+    } catch {
+      // Session invalid / expired
+      setUser(null);
+      TokenStorage.clear();
+      router.push("/login");
+    }
+  }, [router]);
+
   // ── logout ────────────────────────────────────────────────────────────────
   const logout = useCallback((): void => {
     authService.logout();
@@ -183,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     login,
     logout,
+    refreshUser,
     isAdmin,
     isAIEngineer,
     isAnalyst,

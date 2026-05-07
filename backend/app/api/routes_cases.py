@@ -29,6 +29,10 @@ Endpoints
 """
 
 from typing import Optional
+from app.core.dependencies import (
+    get_db,
+    AnalystOrAdminUser,
+)
 
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,10 +63,11 @@ router = APIRouter(prefix="/cases", tags=["Case Management"])
     summary        = "Create a new investigation case",
 )
 async def create_case(
+    current_user: AnalystOrAdminUser,
     payload:      CaseCreate,
     request:      Request,
     db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_active_user),
+
 ):
     """
     Create a new case.
@@ -182,6 +187,7 @@ async def delete_case(
 
 @router.post(
     "/{case_id}/evidence",
+
     response_model = CaseEvidenceResponse,
     status_code    = status.HTTP_201_CREATED,
     summary        = "Link an evidence image to this case",

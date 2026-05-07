@@ -22,8 +22,9 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database     import get_db
-from app.core.dependencies import get_current_active_user
-from app.models.user       import User
+
+from app.core.dependencies import AnalystOrAdminUser
+
 from app.models.forensic_image import ForensicImage, PreprocessedImage
 from app.schemas.image_schema import (
     ImageUploadResponse,
@@ -46,11 +47,12 @@ router = APIRouter(prefix="/images", tags=["Evidence Images"])
     summary        = "Upload a forensic evidence image",
 )
 async def upload_image(
+    current_user: AnalystOrAdminUser,
     request:       Request,
     file:          UploadFile   = File(..., description="Image file (.bmp/.png/.jpg/.jpeg)"),
     evidence_type: str          = Form(..., description="fingerprint | toolmark"),
     db:            AsyncSession = Depends(get_db),
-    current_user:  User         = Depends(get_current_active_user),
+
 ):
     """
     Upload a fingerprint or toolmark evidence image.
@@ -77,11 +79,12 @@ async def upload_image(
     summary        = "List uploaded images",
 )
 async def list_images(
+    current_user: AnalystOrAdminUser,
     evidence_type: Optional[str] = None,
     page:          int           = 1,
     limit:         int           = 20,
     db:            AsyncSession  = Depends(get_db),
-    current_user:  User          = Depends(get_current_active_user),
+
 ):
     """List images for the current user. Filter by evidence_type if needed."""
     return await image_service.list_images(
@@ -103,9 +106,10 @@ async def list_images(
     summary        = "Get image details and processing status",
 )
 async def get_image(
+    current_user: AnalystOrAdminUser,
     image_id:     int,
     db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_active_user),
+
 ):
     """
     Return full image metadata including current processing status.
@@ -128,10 +132,11 @@ async def get_image(
     summary     = "Delete an uploaded image",
 )
 async def delete_image(
+    current_user: AnalystOrAdminUser,
     image_id:     int,
     request:      Request,
     db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_active_user),
+
 ):
     """Delete an image and its enhanced copy and embedding from disk and database."""
     await image_service.delete_image(
@@ -151,9 +156,10 @@ async def delete_image(
     summary = "Get original vs enhanced image for side-by-side display",
 )
 async def get_image_comparison(
+    current_user: AnalystOrAdminUser,
     image_id:     int,
     db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_active_user),
+
 ):
     """
     Returns both the original uploaded image and the preprocessed

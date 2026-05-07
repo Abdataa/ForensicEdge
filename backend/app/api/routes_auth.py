@@ -20,6 +20,7 @@ from app.schemas.user_schema import (
     LoginRequest,
     RefreshRequest,
     ChangePasswordRequest,
+    UpdateMyProfileRequest,
     TokenResponse,
     AccessTokenResponse,
     UserResponse,
@@ -123,6 +124,53 @@ async def refresh(
 async def get_me(current_user: CurrentUser):
     """Return the profile of the currently authenticated user."""
     return UserResponse.model_validate(current_user)
+
+# ---------------------------------------------------------------------------
+# PATCH /auth/me — update current user's own profile (full_name, email)
+# ---------------------------------------------------------------------------
+@router.patch(
+    "/me",
+    response_model = UserResponse,
+    summary        = "Update current user profile",
+)
+async def update_me(
+    payload:      UpdateMyProfileRequest,
+    request:      Request,
+    current_user: CurrentUser,
+    db:           AsyncSession = Depends(get_db),
+):
+    """
+    Update the authenticated user's own profile details.
+
+    Allowed:
+    - full_name
+    - email
+
+    Not allowed:
+    - role
+    - is_active
+    """
+
+    updated_user = await auth_service.update_my_profile(
+        user      = current_user,
+        full_name = payload.full_name,
+        email     = payload.email,
+        db        = db,
+    )
+
+    await create_log(
+        db          = db,
+        action_type = "profile_updated",
+        user_id     = current_user.id,
+        details     = {
+            "updated_fields": list(
+                payload.model_dump(exclude_unset=True).keys()
+            )
+        },
+        ip_address  = request.client.host if request.client else None,
+    )
+
+    return UserResponse.model_validate(updated_user)
 
 #--------------------------------------------------
 @router.post("/change-password", status_code=status.HTTP_200_OK)
