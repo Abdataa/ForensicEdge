@@ -71,28 +71,31 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     icon:  <LayoutDashboard size={18} />,
   },
-  {
-    href:  "/upload",
-    label: "Upload",
-    icon:  <Upload size={18} />,
-  },
-  {
-    href:  "/compare",
-    label: "Compare",
-    icon:  <GitCompare size={18} />,
-  },
-  {
-    href:  "/cases",
-    label: "Case Management",
-    icon:  <FileText size={18} />,
-  },
-
-  {
-    href:  "/reports",
-    label: "Reports",
-    icon:  <FileText size={18} />,
-  },
-  {
+   {
+  href:  "/upload",
+  label: "Upload",
+  icon:  <Upload size={18} />,
+  roles: ["admin", "analyst"],
+ },
+{
+  href:  "/compare",
+  label: "Compare",
+  icon:  <GitCompare size={18} />,
+  roles: ["admin", "analyst"],
+ },
+ {
+  href:  "/cases",
+  label: "Case Management",
+  icon:  <FileText size={18} />,
+  roles: ["admin", "analyst"],
+ },
+ {
+  href:  "/reports",
+  label: "Reports",
+  icon:  <FileText size={18} />,
+  roles: ["admin", "analyst"],
+},
+ {
     href:  "/logs",
     label: "History",
     icon:  <History size={18} />,

@@ -81,6 +81,7 @@ import { RoleBadge, ActiveBadge } from "../components/ui/Badge";
 import Spinner from "../components/ui/Spinner";
 import api from "../services/api";
 import { User } from "../services/authService";
+import { useAuth } from "../hooks/useAuth";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared types — existing
@@ -1330,6 +1331,9 @@ function AuditPagination({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function UsersPanel() {
+  // Know which admin is logged in so we can block self-destructive actions
+  // client-side before they even reach the server.
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -1387,6 +1391,12 @@ function UsersPanel() {
   }, [loadUsers]);
 
   const handleToggleActive = async (user: User) => {
+    // Block self-deactivation client-side for a clear, immediate error message.
+    // The backend also enforces this (HTTP 400), but we surface it proactively.
+    if (user.id === currentUser?.id && user.is_active) {
+      toast.error("You cannot deactivate your own admin account.");
+      return;
+    }
     setTogglingId(user.id);
     try {
       await api.patch(`/admin/users/${user.id}`, {
@@ -1396,14 +1406,22 @@ function UsersPanel() {
         `${user.full_name} ${user.is_active ? "deactivated" : "activated"}.`
       );
       await loadUsers();
-    } catch {
-      toast.error("Update failed.");
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail ?? "Update failed.";
+      toast.error(detail);
     } finally {
       setTogglingId(null);
     }
   };
 
   const handleDelete = async (user: User) => {
+    // Block self-deletion client-side — backend also returns HTTP 400.
+    if (user.id === currentUser?.id) {
+      toast.error("You cannot delete your own admin account.");
+      return;
+    }
     if (
       !confirm(
         `Permanently delete "${user.full_name}"?\n\n` +
@@ -1688,29 +1706,46 @@ function UsersPanel() {
                       </td>
                       <td>
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleToggleActive(user)}
-                            disabled={togglingId === user.id}
-                            title={
-                              user.is_active
-                                ? "Deactivate account"
-                                : "Activate account"
-                            }
-                            className={clsx(
-                              "p-1.5 rounded-lg transition-colors text-gray-500 hover:bg-gray-800",
-                              user.is_active
-                                ? "hover:text-yellow-400"
-                                : "hover:text-green-400"
-                            )}
-                          >
-                            {togglingId === user.id ? (
-                              <Spinner size="sm" />
-                            ) : user.is_active ? (
-                              <UserX size={15} />
+                          {/* ── Toggle active / deactivate ─────────── */}
+                          {(() => {
+                            const isSelf = user.id === currentUser?.id;
+                            // An admin cannot deactivate themselves —
+                            // hide the deactivate button on their own row;
+                            // re-activating another inactive admin is fine.
+                            const canToggle = !(isSelf && user.is_active);
+                            return canToggle ? (
+                              <button
+                                onClick={() => handleToggleActive(user)}
+                                disabled={togglingId === user.id}
+                                title={user.is_active ? "Deactivate account" : "Activate account"}
+                                className={clsx(
+                                  "p-1.5 rounded-lg transition-colors text-gray-500 hover:bg-gray-800",
+                                  user.is_active
+                                    ? "hover:text-yellow-400"
+                                    : "hover:text-green-400"
+                                )}
+                              >
+                                {togglingId === user.id ? (
+                                  <Spinner size="sm" />
+                                ) : user.is_active ? (
+                                  <UserX size={15} />
+                                ) : (
+                                  <UserCheck size={15} />
+                                )}
+                              </button>
                             ) : (
-                              <UserCheck size={15} />
-                            )}
-                          </button>
+                              // Own active account — show a disabled placeholder
+                              // so the row layout doesn't shift
+                              <span
+                                title="Cannot deactivate your own account"
+                                className="p-1.5 rounded-lg text-gray-700 cursor-not-allowed inline-flex"
+                              >
+                                <UserX size={15} />
+                              </span>
+                            );
+                          })()}
+
+                          {/* ── Edit ────────────────────────────────────── */}
                           <button
                             onClick={() => openEditModal(user)}
                             title="Edit user"
@@ -1718,18 +1753,30 @@ function UsersPanel() {
                           >
                             <Pencil size={15} />
                           </button>
-                          <button
-                            onClick={() => handleDelete(user)}
-                            disabled={deletingId === user.id}
-                            title="Delete user permanently"
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
-                          >
-                            {deletingId === user.id ? (
-                              <Spinner size="sm" />
-                            ) : (
+
+                          {/* ── Delete ──────────────────────────────────── */}
+                          {user.id === currentUser?.id ? (
+                            // Cannot delete own account — show disabled placeholder
+                            <span
+                              title="Cannot delete your own account"
+                              className="p-1.5 rounded-lg text-gray-700 cursor-not-allowed inline-flex"
+                            >
                               <Trash2 size={15} />
-                            )}
-                          </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleDelete(user)}
+                              disabled={deletingId === user.id}
+                              title="Delete user permanently"
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
+                            >
+                              {deletingId === user.id ? (
+                                <Spinner size="sm" />
+                              ) : (
+                                <Trash2 size={15} />
+                              )}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
