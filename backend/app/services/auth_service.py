@@ -250,3 +250,47 @@ async def create_first_admin(db: AsyncSession) -> None:
     db.add(admin)
     await db.commit()
     print(f"First admin account created: {email}")
+
+#user self-management functions :
+#          (update profile, change password)go here too,
+# since they also deal with auth logic like password hashing and email uniqueness
+async def update_my_profile(
+    *,
+    user: User,
+    full_name: str | None,
+    email: str | None,
+    db,
+):
+    """
+    Update the currently authenticated user's own profile.
+    """
+
+    # ─────────────────────────────────────────────
+    # Update email
+    # ─────────────────────────────────────────────
+    if email and email != user.email:
+
+        existing = await db.execute(
+            select(User).where(User.email == email)
+        )
+
+        existing_user = existing.scalar_one_or_none()
+
+        if existing_user and existing_user.id != user.id:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Email already in use.",
+            )
+
+        user.email = email
+
+    # ─────────────────────────────────────────────
+    # Update full name
+    # ─────────────────────────────────────────────
+    if full_name:
+        user.full_name = full_name
+
+    await db.commit()
+    await db.refresh(user)
+
+    return user

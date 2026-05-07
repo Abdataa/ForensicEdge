@@ -15,7 +15,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.core.dependencies import  AnalystOrAdminUser
 from app.core.database     import get_db
 from app.core.dependencies import CurrentUser
 from app.schemas.similarity_schema import (
@@ -42,7 +42,7 @@ router = APIRouter(prefix="/compare", tags=["Similarity Analysis"])
 async def compare_images(
     payload:      CompareRequest,
     request:      Request,
-    current_user: CurrentUser,
+    current_user:  AnalystOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -79,7 +79,7 @@ async def compare_images(
 async def search_database(
     payload:      DatabaseSearchRequest,
     request:      Request,
-    current_user: CurrentUser,
+    current_user: AnalystOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -95,7 +95,7 @@ async def search_database(
     """
     return await similarity_service.search_database(
         payload    = payload,
-        user       = current_user,
+        user       = AnalystOrAdminUser,
         db         = db,
         ip_address = request.client.host if request.client else None,
     )
@@ -110,7 +110,7 @@ async def search_database(
     summary        = "List past comparison results",
 )
 async def list_results(
-    current_user:  CurrentUser,
+    current_user:  AnalystOrAdminUser,
     evidence_type: Optional[str] = None,
     page:          int           = 1,
     limit:         int           = 20,
@@ -124,7 +124,7 @@ async def list_results(
     - Admins see all users' results
     """
     return await similarity_service.list_results(
-        user          = current_user,
+        user          = AnalystOrAdminUser,
         db            = db,
         evidence_type = evidence_type,
         page          = page,
@@ -142,7 +142,7 @@ async def list_results(
 )
 async def get_result(
     result_id:    int,
-    current_user: CurrentUser,
+    current_user: AnalystOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """Retrieve a single forensic similarity result by ID."""

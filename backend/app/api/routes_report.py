@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database     import get_db
-from app.core.dependencies import CurrentUser
+from app.core.dependencies import  AnalystOrAdminUser
 from app.schemas.report_schema import (
     ReportCreate,
     ReportResponse,
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/reports", tags=["Forensic Reports"])
 async def generate_report(
     payload:      ReportCreate,
     request:      Request,
-    current_user: CurrentUser  ,
+    current_user: AnalystOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -69,7 +69,7 @@ async def generate_report(
     summary        = "List generated reports",
 )
 async def list_reports(
-    current_user: CurrentUser  ,
+    current_user:AnalystOrAdminUser  ,
     page:         int          = 1,
     limit:        int          = 20,
 
@@ -94,7 +94,7 @@ async def list_reports(
     summary        = "Get report metadata",
 )
 async def get_report(
-    current_user: CurrentUser ,
+    current_user: AnalystOrAdminUser ,
     report_id:    int,
 
     db:           AsyncSession = Depends(get_db),
@@ -115,7 +115,7 @@ async def get_report(
 async def download_report(
     report_id:    int,
     request:      Request,
-    current_user: CurrentUser ,
+    current_user: AnalystOrAdminUser ,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -126,7 +126,7 @@ async def download_report(
     """
     pdf_path = await report_service.get_pdf_path(
         report_id = report_id,
-        user      = current_user,
+        user      = AnalystOrAdminUser,
         db        = db,
     )
 

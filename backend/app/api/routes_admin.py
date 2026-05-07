@@ -389,6 +389,18 @@ async def update_user(
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"User {user_id} not found.")
 
     update_data = payload.model_dump(exclude_unset=True)
+    # ─────────────────────────────────────────────
+    # Prevent admin from deactivating own account
+    # ─────────────────────────────────────────────
+    if (
+        user_id == admin.id
+        and "is_active" in update_data
+        and update_data["is_active"] is False
+    ):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="You cannot deactivate your own admin account.",
+        )
 
     if "password" in update_data:
         update_data["password_hash"] = hash_password(update_data.pop("password"))

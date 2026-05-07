@@ -46,7 +46,8 @@ from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database    import get_db
-from app.core.dependencies import MlUser   # see note below about adding this dependency
+#from app.core.dependencies import MlUser   #
+from app.core.dependencies import AIOrAdminUser
 from app.schemas.ml_schema import (
     DatasetCreate,
     DatasetListResponse,
@@ -96,7 +97,7 @@ async def _job_response(job, db: AsyncSession) -> TrainingJobResponse:
     summary        = "List training / evaluation datasets",
 )
 async def list_datasets(
-    current_user:  MlUser,
+    current_user:  AIOrAdminUser,
     page:          int           = Query(1,  ge=1),
     limit:         int           = Query(20, ge=1, le=100),
     evidence_type: Optional[str] = Query(None, description="fingerprint | toolmark"),
@@ -134,7 +135,7 @@ async def list_datasets(
 )
 async def upload_dataset(
     request:       Request,
-    current_user:  MlUser,
+    current_user:  AIOrAdminUser,
     name:          str          = Form(..., min_length=2, max_length=255),
     evidence_type: str          = Form(...),
     description:   Optional[str] = Form(None),
@@ -184,7 +185,7 @@ async def upload_dataset(
 )
 async def get_dataset(
     dataset_id:   int,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """Retrieve metadata for a single dataset by ID."""
@@ -200,7 +201,7 @@ async def get_dataset(
 async def delete_dataset(
     dataset_id:   int,
     request:      Request,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -227,7 +228,7 @@ async def delete_dataset(
     summary        = "List trained model versions",
 )
 async def list_models(
-    current_user:  MlUser,
+    current_user:  AIOrAdminUser,
     page:          int           = Query(1,  ge=1),
     limit:         int           = Query(20, ge=1, le=100),
     evidence_type: Optional[str] = Query(None),
@@ -258,7 +259,7 @@ async def list_models(
 )
 async def get_model(
     model_id:     int,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """Retrieve full metadata for a model version including all metrics."""
@@ -274,7 +275,7 @@ async def get_model(
 async def activate_model(
     model_id:     int,
     request:      Request,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -311,7 +312,7 @@ async def activate_model(
     summary        = "List training jobs",
 )
 async def list_jobs(
-    current_user:  MlUser,
+    current_user:  AIOrAdminUser,
     page:          int           = Query(1,  ge=1),
     limit:         int           = Query(20, ge=1, le=100),
     evidence_type: Optional[str] = Query(None),
@@ -351,7 +352,7 @@ async def list_jobs(
 async def launch_training_job(
     payload:      TrainingJobCreate,
     request:      Request,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -394,7 +395,7 @@ async def launch_training_job(
 )
 async def get_job(
     job_id:       int,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -415,7 +416,7 @@ async def get_job(
 async def cancel_job(
     job_id:       int,
     request:      Request,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -444,7 +445,7 @@ async def cancel_job(
 async def update_job_progress(
     job_id:       int,
     payload:      TrainingJobProgressUpdate,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -469,7 +470,7 @@ async def update_job_progress(
     summary        = "List evaluation results",
 )
 async def list_evaluations(
-    current_user:  MlUser,
+    current_user:  AIOrAdminUser,
     page:          int           = Query(1,  ge=1),
     limit:         int           = Query(20, ge=1, le=100),
     model_id:      Optional[int] = Query(None),
@@ -501,7 +502,7 @@ async def list_evaluations(
 async def run_evaluation(
     payload:      EvaluationCreate,
     request:      Request,
-    current_user: MlUser,
+    current_user: AIOrAdminUser,
     db:           AsyncSession = Depends(get_db),
 ):
     """
@@ -544,7 +545,7 @@ async def run_evaluation(
 )
 async def get_evaluation(
     evaluation_id: int,
-    current_user:  MlUser,
+    current_user:  AIOrAdminUser,
     db:            AsyncSession = Depends(get_db),
 ):
     """Retrieve the full results of a single evaluation run."""

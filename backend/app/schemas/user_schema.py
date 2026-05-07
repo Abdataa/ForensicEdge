@@ -179,3 +179,13 @@ class UserListResponse(BaseModel):
     page:   int
     limit:  int
     users:  list[UserResponse]
+
+
+class UpdateMyProfileRequest(BaseModel):
+    full_name: Optional[str] = Field(
+        default=None,
+        min_length=2,
+        max_length=120,
+    )
+
+    email: Optional[EmailStr] = None
