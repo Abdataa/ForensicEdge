@@ -29,15 +29,14 @@ Design notes
   Report, AuditLog, Case, CaseAssignment) via joins — no new DB writes at query time.
 - `investigator_activity` is derived by merging AuditLog rows for the target user
   into a typed timeline; it does NOT pollute the audit_logs table with new entries.
-- The /search endpoint tries ilike on full_name, email, and casts id to string so
-  the frontend can match by any of the three in one request.
+- The /search endpoint tries ilike on full_name, email, investigator_id, agency,
+  department, and badge_number so the frontend can match by any of them.
 - All endpoints fail gracefully when optional related models (Case, Image, etc.)
   don't exist yet — they return empty lists rather than 500 errors.
 """
 
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from typing   import Any, Dict, List, Optional
 
@@ -75,8 +74,6 @@ router = APIRouter(prefix="/admin", tags=["Administration"])
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers — safe model imports
 # ─────────────────────────────────────────────────────────────────────────────
-# We import optional models inside functions so the app still boots even if
-# those models haven't been created yet.
 
 def _import_image():
     try:
@@ -121,10 +118,6 @@ def _import_audit_log():
         return None
 
 def _import_login_log():
-    """
-    Dedicated login-event model — optional.
-    Falls back to filtering AuditLog rows where action_type='user_login'.
-    """
     try:
         from app.models.login_log import LoginLog  # type: ignore
         return LoginLog
@@ -148,14 +141,34 @@ class InvestigatorStats(BaseModel):
 
 
 class InvestigatorProfileResponse(BaseModel):
-    user:  UserResponse
-    stats: InvestigatorStats
+    """
+    Full investigator profile returned by GET /investigator/{user_id}/profile.
+
+    Combines:
+      - user:          Full UserResponse (includes agency/clearance metadata)
+      - stats:         Aggregated activity statistics
+      - clearance_badge: Human-readable clearance tier label
+      - employment_status: Current duty status
+    """
+    user:              UserResponse
+    stats:             InvestigatorStats
+    clearance_badge:   str           # e.g. "Level 3 — Senior Investigator"
+    employment_status: str           # mirrors user.employment_status for convenience
+
+
+# Clearance level → human-readable label
+_CLEARANCE_LABELS: Dict[int, str] = {
+    1: "Level 1 — Basic",
+    2: "Level 2 — Investigator",
+    3: "Level 3 — Senior",
+    4: "Level 4 — Supervisor",
+    5: "Level 5 — Admin",
+}
 
 
 class ActivityEvent(BaseModel):
     id:          int
-    event_type:  str          # upload | comparison | report | login | logout |
-                              # case_modified | case_created | feedback
+    event_type:  str
     description: str
     timestamp:   datetime
     metadata:    Optional[Dict[str, Any]] = None
@@ -167,7 +180,7 @@ class InvestigatorCase(BaseModel):
     case_id:          str
     title:            str
     case_type:        str
-    status:           str     # active | completed | pending
+    status:           str
     role:             str
     evidence_count:   int
     reports_authored: int
@@ -199,17 +212,16 @@ class LoginEvent(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 _ACTION_MAP: Dict[str, tuple[str, str]] = {
-    # action_type          → (event_type,       human description template)
-    "image_uploaded":       ("upload",          "Uploaded evidence image"),
-    "comparison_completed": ("comparison",      "Ran similarity comparison"),
-    "report_generated":     ("report",          "Generated forensic report"),
-    "report_downloaded":    ("report",          "Downloaded report"),
-    "feedback_submitted":   ("feedback",        "Submitted feedback"),
-    "user_login":           ("login",           "Logged in"),
-    "user_logout":          ("logout",          "Logged out"),
-    "case_created":         ("case_created",    "Created case"),
-    "case_updated":         ("case_modified",   "Modified case"),
-    "case_assigned":        ("case_modified",   "Was assigned to case"),
+    "image_uploaded":       ("upload",        "Uploaded evidence image"),
+    "comparison_completed": ("comparison",    "Ran similarity comparison"),
+    "report_generated":     ("report",        "Generated forensic report"),
+    "report_downloaded":    ("report",        "Downloaded report"),
+    "feedback_submitted":   ("feedback",      "Submitted feedback"),
+    "user_login":           ("login",         "Logged in"),
+    "user_logout":          ("logout",        "Logged out"),
+    "case_created":         ("case_created",  "Created case"),
+    "case_updated":         ("case_modified", "Modified case"),
+    "case_assigned":        ("case_modified", "Was assigned to case"),
 }
 
 def _audit_to_activity(log_row: Any, idx: int) -> ActivityEvent:
@@ -219,60 +231,44 @@ def _audit_to_activity(log_row: Any, idx: int) -> ActivityEvent:
 
     event_type, base_desc = _ACTION_MAP.get(action, ("admin_action", action))
 
-    # Enrich description from details payload
     desc_parts: list[str] = [base_desc]
-
-    #filename = details.get("filename") or details.get("original_filename")
-    filename: Optional[str] = None
+    filename:    Optional[str] = None
     case_id_val: Optional[str] = None
 
     try:
         if log_row.action_type == "case_created":
             parsed = CaseCreatedDetails(**details)
             case_id_val = parsed.case_id
-
         elif log_row.action_type == "case_updated":
             parsed = CaseUpdatedDetails(**details)
             case_id_val = parsed.case_id
-
         elif log_row.action_type == "case_deleted":
             parsed = CaseDeletedDetails(**details)
             case_id_val = parsed.case_id
-
         elif log_row.action_type == "case_evidence_linked":
             parsed = CaseEvidenceLinkedDetails(**details)
             case_id_val = parsed.case_id
-
         elif log_row.action_type == "case_analysis_linked":
             parsed = CaseAnalysisLinkedDetails(**details)
             case_id_val = parsed.case_id
-
         elif log_row.action_type == "case_report_linked":
             parsed = CaseReportLinkedDetails(**details)
             case_id_val = parsed.case_id
-
         elif log_row.action_type == "case_note_added":
             parsed = CaseNoteAddedDetails(**details)
             case_id_val = parsed.case_id
-
     except Exception:
-        # malformed audit payload — don't crash admin timeline
-        pass
-
+        pass  # malformed audit payload — don't crash admin timeline
 
     if filename:
         desc_parts.append(f"— {filename}")
-
-
     if case_id_val:
         case_id_val = str(case_id_val)
-
-    description = " ".join(str(p) for p in desc_parts)
 
     return ActivityEvent(
         id          = getattr(log_row, "id", idx),
         event_type  = event_type,
-        description = description,
+        description = " ".join(str(p) for p in desc_parts),
         timestamp   = log_row.timestamp,
         metadata    = details if details else None,
         case_id     = case_id_val,
@@ -281,7 +277,7 @@ def _audit_to_activity(log_row: Any, idx: int) -> ActivityEvent:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Existing user-management endpoints (unchanged)
+# User management endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get(
@@ -290,14 +286,20 @@ def _audit_to_activity(log_row: Any, idx: int) -> ActivityEvent:
     summary        = "List all system users",
 )
 async def list_users(
-    _:         AdminUser,
-    role:      Optional[str]  = None,
-    is_active: Optional[bool] = None,
-    page:      int            = 1,
-    limit:     int            = 20,
-    db:        AsyncSession   = Depends(get_db),
+    _:                 AdminUser,
+    role:              Optional[str]  = None,
+    is_active:         Optional[bool] = None,
+    employment_status: Optional[str]  = None,
+    clearance_level:   Optional[int]  = None,
+    agency:            Optional[str]  = None,
+    page:              int            = 1,
+    limit:             int            = 20,
+    db:                AsyncSession   = Depends(get_db),
 ):
-    """List all registered users with optional filters."""
+    """
+    List all registered users with optional filters.
+    New filters: employment_status, clearance_level, agency.
+    """
     limit = min(limit, 100)
     query = select(User)
 
@@ -305,6 +307,12 @@ async def list_users(
         query = query.where(User.role == role)
     if is_active is not None:
         query = query.where(User.is_active == is_active)
+    if employment_status:
+        query = query.where(User.employment_status == employment_status)
+    if clearance_level is not None:
+        query = query.where(User.clearance_level == clearance_level)
+    if agency:
+        query = query.where(User.agency.ilike(f"%{agency}%"))
 
     count_result = await db.execute(query.with_only_columns(User.id))
     total = len(count_result.all())
@@ -335,7 +343,10 @@ async def create_user(
     admin:   AdminUser,
     db:      AsyncSession = Depends(get_db),
 ):
-    """Create a new user account directly as admin."""
+    """
+    Create a new user account directly as admin.
+    Supports all UserCreate fields including agency metadata.
+    """
     user = await auth_service.register(payload, db)
 
     await create_log(
@@ -344,8 +355,10 @@ async def create_user(
         user_id     = admin.id,
         details     = {
             "created_user_id": user.id,
+            "investigator_id": user.investigator_id,
             "email":           user.email,
             "role":            user.role,
+            "clearance_level": user.clearance_level,
         },
         ip_address  = request.client.host if request.client else None,
     )
@@ -362,7 +375,7 @@ async def get_user(
     _:       AdminUser,
     db:      AsyncSession = Depends(get_db),
 ):
-    """Retrieve details for any user by their ID."""
+    """Retrieve full details for any user by their internal ID."""
     row  = await db.execute(select(User).where(User.id == user_id))
     user = row.scalar_one_or_none()
     if user is None:
@@ -382,16 +395,23 @@ async def update_user(
     admin:   AdminUser,
     db:      AsyncSession = Depends(get_db),
 ):
-    """Update a user's profile, role, or active status."""
+    """
+    Update a user's profile, role, clearance, employment status, or active flag.
+
+    Sensitive field rules
+    ---------------------
+    - is_active: admin cannot deactivate their own account.
+    - password: re-hashed before storage; never stored in plain text.
+    - role: enum value extracted before ORM assignment.
+    """
     row  = await db.execute(select(User).where(User.id == user_id))
     user = row.scalar_one_or_none()
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"User {user_id} not found.")
 
     update_data = payload.model_dump(exclude_unset=True)
-    # ─────────────────────────────────────────────
+
     # Prevent admin from deactivating own account
-    # ─────────────────────────────────────────────
     if (
         user_id == admin.id
         and "is_active" in update_data
@@ -420,6 +440,7 @@ async def update_user(
         user_id     = admin.id,
         details     = {
             "updated_user_id": user_id,
+            "investigator_id": user.investigator_id,
             "fields_changed":  list(update_data.keys()),
         },
         ip_address  = request.client.host if request.client else None,
@@ -454,7 +475,11 @@ async def delete_user(
         db          = db,
         action_type = "user_deleted",
         user_id     = admin.id,
-        details     = {"deleted_user_id": user_id, "email": user.email},
+        details     = {
+            "deleted_user_id": user_id,
+            "investigator_id": user.investigator_id,
+            "email":           user.email,
+        },
         ip_address  = request.client.host if request.client else None,
     )
     await db.delete(user)
@@ -462,7 +487,7 @@ async def delete_user(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Audit logs (unchanged)
+# Audit logs
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get(
@@ -486,7 +511,7 @@ async def get_audit_logs(
         user_id     = user_id,
         action_type = action_type,
     )
-    pages = max(1, -(-total // limit))   # ceiling division
+    pages = max(1, -(-total // limit))
     return {
         "total": total,
         "page":  page,
@@ -507,7 +532,7 @@ async def get_audit_logs(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Health check (unchanged)
+# Health check
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get(
@@ -557,10 +582,10 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     ]
 
     metrics = {
-        "avg_response_ms":  142,
-        "requests_today":   2841,
-        "active_sessions":  7,
-        "error_rate_pct":   0.3,
+        "avg_response_ms": 142,
+        "requests_today":  2841,
+        "active_sessions": 7,
+        "error_rate_pct":  0.3,
     }
 
     return {
@@ -575,35 +600,42 @@ async def health_check(db: AsyncSession = Depends(get_db)):
 # ═════════════════════════════════════════════════════════════════════════════
 # Investigator Intelligence System
 # ─────────────────────────────────────────────────────────────────────────────
-# IMPORTANT: the /search route MUST be declared before /{user_id}/... routes
-# so FastAPI doesn't try to match the literal string "search" as a user_id int.
+# IMPORTANT: /search MUST be declared before /{user_id}/... routes so FastAPI
+# doesn't interpret the literal string "search" as a user_id integer.
 # ═════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/investigator/search",
     response_model = UserListResponse,
-    summary        = "Search investigators by name, email, or ID",
+    summary        = "Search investigators by name, email, ID, agency, or badge",
     tags           = ["Administration", "Investigator Intelligence"],
 )
 async def search_investigators(
     _:     AdminUser,
-    q:     str           = Query(..., min_length=1, description="Name, email, or numeric user ID"),
-    limit: int           = Query(20, ge=1, le=100),
-    db:    AsyncSession  = Depends(get_db),
+    q:     str          = Query(..., min_length=1, description="Name, email, investigator_id, agency, department, or badge number"),
+    limit: int          = Query(20, ge=1, le=100),
+    db:    AsyncSession = Depends(get_db),
 ):
     """
-    Full-text style search across full_name, email, and user ID.
+    Full-text style search across multiple identity fields.
 
-    - Partial matches are supported (ilike with % wildcards).
-    - Numeric-only queries also match user IDs exactly.
-    - Results are ordered: exact-email match first, then by full_name.
+    Searched fields
+    ---------------
+    - full_name, email, investigator_id  (original)
+    - agency, department, badge_number   (new — from expanded User model)
+
+    Partial matches are supported (ilike with % wildcards).
+    Results are ordered by full_name.
     """
     pattern = f"%{q.strip()}%"
 
     conditions = [
         User.full_name.ilike(pattern),
         User.email.ilike(pattern),
-        cast(User.id, String).ilike(pattern),
+        User.investigator_id.ilike(pattern),
+        User.agency.ilike(pattern),
+        User.department.ilike(pattern),
+        User.badge_number.ilike(pattern),
     ]
 
     query = (
@@ -639,23 +671,29 @@ async def get_investigator_profile(
     db:      AsyncSession = Depends(get_db),
 ):
     """
-    Returns the user record combined with aggregated activity statistics:
+    Returns the full user record combined with aggregated activity statistics.
+
+    New fields vs previous version
+    --------------------------------
+    - clearance_badge:   human-readable label derived from User.clearance_level
+    - employment_status: surfaced directly from the User record
+    - UserResponse now carries agency, department, rank, badge_number,
+      clearance_level, and employment_status for the frontend to display.
+
+    Statistics
+    ----------
     - Total uploads, comparisons, reports, cases
     - Last login timestamp and last active timestamp
     - Login count over the past 30 days
-    - Average daily actions over the past 30 days (activity rate)
-
-    All counts are derived from AuditLog rows for this user.
-    Additional counts are enriched from Image / ComparisonResult / Report
-    tables if those models are available.
+    - Average daily actions over the past 30 days
     """
-    # ── 1. Fetch the user ────────────────────────────────────────────────────
+    # 1. Fetch the user ───────────────────────────────────────────────────────
     row  = await db.execute(select(User).where(User.id == user_id))
     user = row.scalar_one_or_none()
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"User {user_id} not found.")
 
-    # ── 2. AuditLog-based counts ─────────────────────────────────────────────
+    # 2. AuditLog-based counts ────────────────────────────────────────────────
     AuditLog = _import_audit_log()
 
     total_uploads     = 0
@@ -670,7 +708,6 @@ async def get_investigator_profile(
         from datetime import timedelta
         cutoff_30d = datetime.now(timezone.utc) - timedelta(days=30)
 
-        # All audit rows for this user
         all_logs_result = await db.execute(
             select(AuditLog)
             .where(AuditLog.user_id == user_id)
@@ -680,7 +717,6 @@ async def get_investigator_profile(
 
         for log in all_logs:
             ts = log.timestamp
-            # Normalise tz-naive timestamps for comparison
             if ts is not None and ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
 
@@ -698,15 +734,14 @@ async def get_investigator_profile(
 
             if last_active is None and ts is not None:
                 last_active = log.timestamp
-
             if ts >= cutoff_30d:
                 total_actions_30d += 1
 
-    # ── 3. Enrich from Image / Report / Case tables if available ────────────
-    Image          = _import_image()
+    # 3. Enrich from Image / Report / Case tables if available ────────────────
+    Image            = _import_image()
     ComparisonResult = _import_comparison()
-    Report         = _import_report()
-    CaseAssignment = _import_case_assignment()
+    Report           = _import_report()
+    CaseAssignment   = _import_case_assignment()
 
     if Image is not None:
         try:
@@ -715,7 +750,7 @@ async def get_investigator_profile(
             )
             total_uploads = cnt.scalar() or total_uploads
         except Exception:
-            pass  # column name may differ; fall back to AuditLog count
+            pass
 
     if ComparisonResult is not None:
         try:
@@ -758,9 +793,16 @@ async def get_investigator_profile(
         avg_daily_actions = avg_daily,
     )
 
+    clearance_badge = _CLEARANCE_LABELS.get(
+        user.clearance_level,
+        f"Level {user.clearance_level}",
+    )
+
     return InvestigatorProfileResponse(
-        user  = UserResponse.model_validate(user),
-        stats = stats,
+        user              = UserResponse.model_validate(user),
+        stats             = stats,
+        clearance_badge   = clearance_badge,
+        employment_status = user.employment_status,
     )
 
 
@@ -782,17 +824,8 @@ async def get_investigator_activity(
 ):
     """
     Returns a reverse-chronological activity timeline derived from AuditLog.
-
-    Each AuditLog row for this user is converted into a typed ActivityEvent:
-      - upload | comparison | report | login | logout
-      - case_created | case_modified | feedback | admin_action
-
-    The `details` JSON payload is unpacked to build human-readable descriptions
-    and extract case_id / filename references where present.
-
-    This does NOT write any new rows — it is a pure read of audit_logs.
+    Pure read — does NOT write any new audit rows.
     """
-    # Guard: user must exist
     user_row = await db.execute(select(User.id).where(User.id == user_id))
     if user_row.scalar_one_or_none() is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"User {user_id} not found.")
@@ -829,19 +862,8 @@ async def get_investigator_cases(
 ):
     """
     Returns all cases assigned to the investigator.
-
-    Reads from CaseAssignment (join → Case) if the model is available.
-    Falls back to extracting unique case_id values from audit_log.details
-    when those models are not yet present — so this endpoint always returns
-    something useful even in a partial deployment.
-
-    Each entry includes:
-      - case_id, title, case_type, status, role
-      - evidence_count   (images linked to this case by this user)
-      - reports_authored (reports linked to this case by this user)
-      - last_activity    (most recent audit event for this case)
+    Falls back to AuditLog mining when CaseAssignment / Case models are absent.
     """
-    # Guard
     user_row = await db.execute(select(User.id).where(User.id == user_id))
     if user_row.scalar_one_or_none() is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"User {user_id} not found.")
@@ -854,7 +876,7 @@ async def get_investigator_cases(
 
     results: list[InvestigatorCase] = []
 
-    # ── Path A: proper Case + CaseAssignment models exist ───────────────────
+    # Path A: proper Case + CaseAssignment models ─────────────────────────────
     if CaseAssignment is not None and Case is not None:
         rows = await db.execute(
             select(CaseAssignment, Case)
@@ -865,21 +887,19 @@ async def get_investigator_cases(
         assignments = rows.all()
 
         for assignment, case in assignments:
-            # Evidence count this user uploaded for this case
             ev_count = 0
             if Image is not None:
                 try:
                     cnt = await db.execute(
                         select(func.count()).where(
-                            Image.case_id        == case.id,
-                            Image.uploaded_by    == user_id,
+                            Image.case_id     == case.id,
+                            Image.uploaded_by == user_id,
                         )
                     )
                     ev_count = cnt.scalar() or 0
                 except Exception:
                     pass
 
-            # Reports this user authored for this case
             rep_count = 0
             if Report is not None:
                 try:
@@ -893,7 +913,6 @@ async def get_investigator_cases(
                 except Exception:
                     pass
 
-            # Last activity timestamp from audit_log
             last_ts: datetime = case.updated_at or case.created_at
             if AuditLog is not None:
                 try:
@@ -927,7 +946,7 @@ async def get_investigator_cases(
             )
         return results
 
-    # ── Path B: fallback — mine audit_log.details for case references ────────
+    # Path B: fallback — mine AuditLog for case references ───────────────────
     if AuditLog is None:
         return []
 
@@ -938,26 +957,17 @@ async def get_investigator_cases(
     )
     logs = log_rows.scalars().all()
 
-    # Collect unique case IDs preserving first-seen order
-    seen:    dict[str, dict[str, Any]] = {}
+    seen: dict[str, dict[str, Any]] = {}
     for log in logs:
         details = log.details or {}
-        cid = (
-            details.get("case_id")
-            or details.get("case_number")
-        )
+        cid = details.get("case_id") or details.get("case_number")
         if not cid:
             continue
         cid = str(cid)
         if cid not in seen:
-            seen[cid] = {
-                "last_ts":       log.timestamp,
-                "ev_count":      0,
-                "rep_count":     0,
-                "upload_count":  0,
-            }
+            seen[cid] = {"last_ts": log.timestamp, "ev_count": 0, "rep_count": 0}
         if log.action_type == "image_uploaded":
-            seen[cid]["upload_count"] += 1
+            seen[cid]["ev_count"] += 1
         if log.action_type == "report_generated":
             seen[cid]["rep_count"] += 1
 
@@ -969,7 +979,7 @@ async def get_investigator_cases(
                 case_type        = "Unknown",
                 status           = "active",
                 role             = "investigator",
-                evidence_count   = data["upload_count"],
+                evidence_count   = data["ev_count"],
                 reports_authored = data["rep_count"],
                 last_activity    = data["last_ts"],
             )
@@ -995,13 +1005,7 @@ async def get_investigator_evidence(
 ):
     """
     Returns all evidence images uploaded by this investigator.
-
-    - Reads from the Image model (uploaded_by == user_id) when available.
-    - Falls back to AuditLog rows with action_type='image_uploaded' and
-      reconstructs metadata from the details JSON.
-    - `ai_analyzed`      is True when a ComparisonResult row references the image.
-    - `report_generated` is True when a Report row references the image.
-    - `file_hash`        is pulled from Image.file_hash if the column exists.
+    Falls back to AuditLog reconstruction when the Image model is absent.
     """
     user_row = await db.execute(select(User.id).where(User.id == user_id))
     if user_row.scalar_one_or_none() is None:
@@ -1014,7 +1018,7 @@ async def get_investigator_evidence(
 
     results: list[EvidenceItem] = []
 
-    # ── Path A: Image model available ────────────────────────────────────────
+    # Path A: Image model available ───────────────────────────────────────────
     if Image is not None:
         try:
             rows = await db.execute(
@@ -1026,14 +1030,13 @@ async def get_investigator_evidence(
             images = rows.scalars().all()
 
             for img in images:
-                # Check AI analysis
                 ai_done = False
                 if ComparisonResult is not None:
                     try:
                         chk = await db.execute(
                             select(ComparisonResult.id).where(
                                 or_(
-                                    ComparisonResult.query_image_id   == img.id,
+                                    ComparisonResult.query_image_id     == img.id,
                                     ComparisonResult.reference_image_id == img.id,
                                 )
                             ).limit(1)
@@ -1071,7 +1074,7 @@ async def get_investigator_evidence(
         except Exception:
             pass  # column mismatch — fall through to AuditLog path
 
-    # ── Path B: reconstruct from audit log ────────────────────────────────────
+    # Path B: reconstruct from audit log ──────────────────────────────────────
     if AuditLog is None:
         return []
 
@@ -1086,7 +1089,7 @@ async def get_investigator_evidence(
     )
     logs = log_rows.scalars().all()
 
-    for idx, log in enumerate(logs):
+    for log in logs:
         details = log.details or {}
         results.append(
             EvidenceItem(
@@ -1122,13 +1125,7 @@ async def get_investigator_logins(
 ):
     """
     Returns login history newest-first.
-
-    - If a dedicated LoginLog model is present it is used directly.
-    - Otherwise audit_log rows where action_type IN ('user_login', 'user_logout',
-      'login_failed') are used. `success` is True for 'user_login', False for
-      'login_failed'.
-
-    The `user_agent` is pulled from details.user_agent when available.
+    Uses a dedicated LoginLog model when present; falls back to AuditLog.
     """
     user_row = await db.execute(select(User.id).where(User.id == user_id))
     if user_row.scalar_one_or_none() is None:
@@ -1136,7 +1133,7 @@ async def get_investigator_logins(
 
     LoginLog = _import_login_log()
 
-    # ── Path A: dedicated LoginLog model ─────────────────────────────────────
+    # Path A: dedicated LoginLog model ────────────────────────────────────────
     if LoginLog is not None:
         try:
             rows = await db.execute(
@@ -1157,9 +1154,9 @@ async def get_investigator_logins(
                 for lr in login_rows
             ]
         except Exception:
-            pass  # fall through
+            pass
 
-    # ── Path B: audit_log fallback ────────────────────────────────────────────
+    # Path B: AuditLog fallback ───────────────────────────────────────────────
     AuditLog = _import_audit_log()
     if AuditLog is None:
         return []
@@ -1177,16 +1174,13 @@ async def get_investigator_logins(
     )
     logs = rows.scalars().all()
 
-    events: list[LoginEvent] = []
-    for log in logs:
-        details = log.details or {}
-        events.append(
-            LoginEvent(
-                id         = log.id,
-                timestamp  = log.timestamp,
-                ip_address = log.ip_address or details.get("ip_address", "unknown"),
-                user_agent = details.get("user_agent"),
-                success    = log.action_type != "login_failed",
-            )
+    return [
+        LoginEvent(
+            id         = log.id,
+            timestamp  = log.timestamp,
+            ip_address = log.ip_address or (log.details or {}).get("ip_address", "unknown"),
+            user_agent = (log.details or {}).get("user_agent"),
+            success    = log.action_type != "login_failed",
         )
-    return events
+        for log in logs
+    ]

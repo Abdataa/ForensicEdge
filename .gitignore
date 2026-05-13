@@ -45,3 +45,9 @@ docs/Experiment_Results/
 gen_system.md
 ###
 backend/app/schemas/audit/*.py
+
+
+##cv project
+cv_project/
+#ignore folder srtuctures
+project_structure.md
