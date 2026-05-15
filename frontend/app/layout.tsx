@@ -1,17 +1,11 @@
 import "./globals.css";
+import type { ReactNode } from "react";
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-gray-950 text-white antialiased">
-        {/* This 'children' will be:
-            1. The Login page (if you are on /login)
-            2. The DashboardLayout (if you are on /dashboard)
-        */}
+      {/* Remove the gray background here so it doesn't flash during loading */}
+      <body className="bg-[#0a0a0a] antialiased">
         {children}
       </body>
     </html>

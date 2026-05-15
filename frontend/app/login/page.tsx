@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Shield, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Shield, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,138 +19,135 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // --- MOCK BACKEND LOGIC (For Friday Demo) ---
+    // Mock Authentication Logic
     setTimeout(() => {
       let mockRole = "";
+      let targetPath = "";
 
-      if (email === "analyst@astu.et") mockRole = "analyst";
-      else if (email === "engineer@astu.et") mockRole = "ai_engineer";
-      else if (email === "admin@astu.et") mockRole = "admin";
+      if (email === "admin@astu.et") {
+        mockRole = "admin";
+        targetPath = "/admin";
+      } else if (email === "analyst@astu.et") {
+        mockRole = "analyst";
+        targetPath = "/analyst";
+      } else if (email === "engineer@astu.et") {
+        mockRole = "ai_engineer";
+        targetPath = "/engineer";
+      }
 
       if (mockRole && password === "password123") {
         localStorage.setItem("userRole", mockRole);
         localStorage.setItem("userName", "Mary");
-        router.push("/dashboard");
+        router.push(targetPath);
       } else {
-        alert("Invalid credentials. Try analyst@astu.et / password123");
+        alert("Invalid credentials.");
       }
       setIsLoading(false);
-    }, 1000); 
+    }, 1000);
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-950">
-      {/* LEFT COLUMN: Login Form (Using Figma Ochre Color) */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 md:px-16 lg:px-24 bg-[#A1773B] border-r border-gray-800">
-        <div className="max-w-md w-full mx-auto space-y-8">
-          <div>
-            <h2 className="text-4xl font-bold text-white tracking-tight">Welcome Back</h2>
-            <p className="text-white mt-2 font-medium">Enter your credentials to access the ForensicEdge terminal.</p>
-          </div>
+    <main className="flex min-h-screen w-full overflow-hidden">
+      {/* LEFT COLUMN: Login Form (Ochre background) */}
+      <section className="w-full lg:w-1/2 flex flex-col justify-center items-center px-8 md:px-16 bg-[#A1773B] z-10">
+        <div className="max-w-md w-full space-y-8 text-white">
+          <header className="space-y-2">
+            <h2 className="text-3xl font-bold tracking-tight">Welcome Back</h2>
+            <p className="text-sm opacity-90">Sign in to access your forensic analysis tools</p>
+          </header>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-4">
-              {/* Email Input */}
-              <div className="relative group">
-                <Mail className="absolute left-3 top-3 size-5 text-white group-focus-within:text-white/80 transition-colors" />
+              <div className="space-y-2">
+                <label className="text-sm font-medium block">Email</label>
                 <Input
                   type="email"
-                  placeholder="Email Address"
-                  className="pl-10 bg-black/20 border-white/20 text-white placeholder:text-white/60 h-12 focus:border-white focus:ring-1 focus:ring-white rounded-xl transition-all"
+                  placeholder="Enter your email"
+                  className="bg-black/10 border-none text-white placeholder:text-white/50 h-12 focus-visible:ring-1 focus-visible:ring-white w-full"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
 
-              {/* Password Input */}
-              <div className="relative group">
-                <Lock className="absolute left-3 top-3 size-5 text-white group-focus-within:text-white/80 transition-colors" />
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  className="pl-10 bg-black/20 border-white/20 text-white placeholder:text-white/60 h-12 focus:border-white focus:ring-1 focus:ring-white rounded-xl transition-all"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-white/70 hover:text-white transition-colors"
-                >
-                  {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
-                </button>
+              <div className="space-y-2">
+                <label className="text-sm font-medium block">Password</label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your Password"
+                    className="bg-black/10 border-none text-white placeholder:text-white/50 h-12 focus-visible:ring-1 focus-visible:ring-white w-full pr-12"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between text-xs">
               <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="remember" 
-                  className="border-white/50 data-[state=checked]:bg-black data-[state=checked]:border-black" 
-                />
-                <label htmlFor="remember" className="text-sm text-white cursor-pointer hover:text-gray-100">
-                  Remember Me
-                </label>
+                <Checkbox id="remember" className="border-white/50 data-[state=checked]:bg-white data-[state=checked]:text-[#A1773B]" />
+                <label htmlFor="remember" className="cursor-pointer">Remember me</label>
               </div>
-              <button type="button" className="text-sm text-white hover:underline transition-colors">
-                Forgot Password?
-              </button>
+              <button type="button" className="hover:underline">Forgot Password?</button>
             </div>
 
             <Button 
               type="submit" 
+              className="w-full bg-black hover:bg-black/80 text-white font-bold h-12 rounded-md transition-all uppercase tracking-wider"
               disabled={isLoading}
-              className="w-full bg-black hover:bg-gray-900 text-white font-bold h-12 rounded-xl transition-all shadow-lg active:scale-[0.98]"
             >
-              {isLoading ? "Authenticating..." : "Sign In"}
+              {isLoading ? "Authenticating..." : "Sign in"}
             </Button>
           </form>
 
-          <p className="text-center text-white/80 text-sm">
-            Need an account? <button className="text-white font-semibold hover:underline">Request Access</button>
-          </p>
+          <footer className="text-center space-y-4 pt-4">
+            <p className="text-sm">
+              Don't have an account? <button className="font-bold hover:underline">Request Access</button>
+            </p>
+            <p className="text-[10px] opacity-70 uppercase tracking-[0.2em]">Secure encrypted connection</p>
+          </footer>
         </div>
-      </div>
+      </section>
 
-      {/* RIGHT COLUMN: Full Image Branding (RESTORED EXACTLY) */}
-      <div className="hidden lg:flex w-1/2 relative bg-gray-950 items-center justify-center overflow-hidden">
-        
-        {/* Background Image Container */}
+      {/* RIGHT COLUMN: Full Background Image */}
+      <section className="hidden lg:flex w-1/2 flex-col items-center justify-center relative">
+        {/* Background Image filling the entire section */}
         <div className="absolute inset-0 z-0">
           <Image
             src="/images/login-bg.jpg"
-            alt="Forensic Investigation Background"
+            alt="Forensic Investigation"
             fill
-            unoptimized
-            className="object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-[2000ms]"
+            className="object-cover"
             priority
           />
-          {/* Deep gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/40 to-transparent" />
-        </div>
-        
-        {/* Foreground Content */}
-        <div className="relative z-10 text-center space-y-6">
-          <div className="inline-block p-5 bg-gray-900/80 backdrop-blur-md border border-amber-600/30 rounded-3xl shadow-2xl shadow-black/50">
-            <Shield className="size-20 text-amber-500" strokeWidth={1.2} />
-          </div>
-          
-          <div className="space-y-2">
-            <h1 className="text-5xl font-extrabold tracking-[0.25em] text-white uppercase italic">
-              ForensicEdge
-            </h1>
-            <div className="h-1.5 w-24 bg-amber-600 mx-auto rounded-full shadow-[0_0_15px_rgba(217,119,6,0.6)]" />
-          </div>
-          
-          <p className="text-gray-400 tracking-widest text-xs uppercase font-medium">
-            AI OPTIMIZED EVIDENCE ANALYSIS
-          </p>
+          {/* Overlay to ensure text remains readable */}
+          <div className="absolute inset-0 bg-black/40" />
         </div>
 
-        <div className="absolute bottom-0 right-0 size-96 bg-amber-600/10 blur-[120px] rounded-full -mr-48 -mb-48" />
-      </div>
-    </div>
+        {/* Branding content sitting on top of the image */}
+        <div className="text-center space-y-6 z-10">
+          <div className="flex justify-center">
+             <div className="p-4 rounded-full border border-amber-500/30 bg-black/20 backdrop-blur-sm">
+                <Shield className="size-12 text-amber-500" strokeWidth={1.5} />
+             </div>
+          </div>
+          <h1 className="text-4xl font-light tracking-[0.4em] text-white uppercase drop-shadow-2xl">
+            Forensic<span className="font-bold">Edge</span>
+          </h1>
+        </div>
+        
+        {/* Bottom glow effect */}
+        <div className="absolute bottom-0 right-0 w-full h-1/3 bg-gradient-to-t from-black to-transparent z-5 pointer-events-none" />
+      </section>
+    </main>
   );
 }
