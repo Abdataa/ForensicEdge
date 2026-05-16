@@ -72,64 +72,159 @@ npm run dev
 ├── 📄 docker-compose.yml
 ├── 📄 LICENSE
 │
-├── 📁 backend/                          # FastAPI Application Layer
-│   ├── 📄 requirements.txt
-│   ├── 📄 Dockerfile
-│   ├── 📄 .env
+├── 📁 backend/
+│   .env
+│   .gitignore
+│   alembic.ini
+│   project_structure.txt
+│   requirements.txt
+│   seed_data.py
+│   test_db.py
+│
+├───alembic
+│   │   env.py
+│   │   README
+│   │   script.py.mako
 │   │
-│   └── 📁 app/
-│       ├── 📄 main.py
-│       │
-│       ├── 📁 api/                      # Route Definitions
-│       │   ├── 📄 routes_auth.py
-│       │   ├── 📄 routes_upload.py
-│       │   ├── 📄 routes_compare.py
-│       │   ├── 📄 routes_report.py
-│       │   ├── 📄 routes_admin.py
-│       │   ├── 📄 routes_logs.py
-│       │   └── 📄 routes_feedback.py
-│       │
-│       ├── 📁 core/                     # Core Configurations
-│       │   ├── 📄 config.py
-│       │   ├── 📄 security.py
-│       │   ├── 📄 database.py
-│       │   └── 📄 dependencies.py
-│       │
-│       ├── 📁 models/                   # SQLAlchemy Models
-│       │   ├── 📄 user.py
-│       │   ├── 📄 forensic_image.py
-│       │   ├── 📄 similarity_result.py
-│       │   ├── 📄 report.py
-│       │   ├── 📄 dataset.py
-│       │   ├── 📄 audit_log.py
-│       │   └── 📄 feedback.py
-│       │
-│       ├── 📁 schemas/                  # Pydantic Schemas
-│       │   ├── 📄 user_schema.py
-│       │   ├── 📄 image_schema.py
-│       │   ├── 📄 similarity_schema.py
-│       │   ├── 📄 report_schema.py
-│       │   └── 📄 feedback_schema.py
-│       │
-│       ├── 📁 services/                 # Business Logic Layer
-│       │   ├── 📄 auth_service.py
-│       │   ├── 📄 image_service.py
-│       │   ├── 📄 similarity_service.py
-│       │   ├── 📄 report_service.py
-│       │   ├── 📄 log_service.py
-│       │   └── 📄 feedback_service.py
-│       │
-│       ├── 📁 db/
-│       │   ├── 📄 base.py
-│       │   └── 📄 session.py
-│       │
-│       └── 📁 utils/
-│           ├── 📄 file_validator.py
-│           ├── 📄 image_processing.py
-│           └── 📄 logger.py
+│   └───versions
+│           01cc3e270e2b_initial_postgresql_schema.py
+│           5aa38828c404_initial_migration.py
 │
-│
-├── 📁 ai_engine/                        # AI & Research Layer (Your Domain)
+└───app
+    │   main.py
+    │
+    ├───api
+    │   │   routes_admin.py
+    │   │   routes_auth.py
+    │   │   routes_cases.py
+    │   │   routes_compare.py
+    │   │   routes_feedback.py
+    │   │   routes_logs.py
+    │   │   routes_ml.py
+    │   │   routes_report.py
+    │   │   routes_upload.py
+    │   │   temp_routes_upload.py
+    │   │
+    │   └───__pycache__
+    │           routes_admin.cpython-311.pyc
+    │           routes_auth.cpython-311.pyc
+    │           routes_cases.cpython-311.pyc
+    │           routes_compare.cpython-311.pyc
+    │           routes_feedback.cpython-311.pyc
+    │           routes_logs.cpython-311.pyc
+    │           routes_ml.cpython-311.pyc
+    │           routes_report.cpython-311.pyc
+    │           routes_upload.cpython-311.pyc
+    │           __init__.cpython-311.pyc
+    │
+    ├───core
+    │   │   config.py
+    │   │   database.py
+    │   │   dependencies.py
+    │   │   dependencies_ml_addition.py
+    │   │   security.py
+    │   │
+    │   └───__pycache__
+    │           config.cpython-311.pyc
+    │           database.cpython-311.pyc
+    │           dependencies.cpython-311.pyc
+    │           security.cpython-311.pyc
+    │
+    ├───db
+    │   │   base.py
+    │   │   session.py
+    │   │
+    │   └───__pycache__
+    │           base.cpython-311.pyc
+    │
+    ├───models
+    │   │   audit_log.py
+    │   │   case.py
+    │   │   dataset.py
+    │   │   feedback.py
+    │   │   forensic_image.py
+    │   │   ml.py
+    │   │   report.py
+    │   │   similarity_result.py
+    │   │   user.py
+    │   │
+    │   └───__pycache__
+    │           audit_log.cpython-311.pyc
+    │           case.cpython-311.pyc
+    │           dataset.cpython-311.pyc
+    │           feedback.cpython-311.pyc
+    │           forensic_image.cpython-311.pyc
+    │           ml.cpython-311.pyc
+    │           report.cpython-311.pyc
+    │           similarity_result.cpython-311.pyc
+    │           user.cpython-311.pyc
+    │
+    ├───schemas
+    │   │   case_schema.py
+    │   │   feedback_schema.py
+    │   │   image_schema.py
+    │   │   ml_schema.py
+    │   │   report_schema.py
+    │   │   similarity_schema.py
+    │   │   user_schema.py
+    │   │
+    │   ├───audit
+    │   │   │   auth_events.py
+    │   │   │   case_events.py
+    │   │   │   image_events.py
+    │   │   │   registry.py
+    │   │   │   report_events.py
+    │   │   │   __init__.py
+    │   │   │
+    │   │   └───__pycache__
+    │   │           auth_events.cpython-311.pyc
+    │   │           case_events.cpython-311.pyc
+    │   │           image_events.cpython-311.pyc
+    │   │           registry.cpython-311.pyc
+    │   │           report_events.cpython-311.pyc
+    │   │           __init__.cpython-311.pyc
+    │   │
+    │   └───__pycache__
+    │           case_schema.cpython-311.pyc
+    │           feedback_schema.cpython-311.pyc
+    │           image_schema.cpython-311.pyc
+    │           ml_schema.cpython-311.pyc
+    │           report_schema.cpython-311.pyc
+    │           similarity_schema.cpython-311.pyc
+    │           user_schema.cpython-311.pyc
+    │
+    ├───services
+    │   │   auth_service.py
+    │   │   case_service.py
+    │   │   feedback_service.py
+    │   │   image_service.py
+    │   │   log_service.py
+    │   │   ml_service.py
+    │   │   report_service.py
+    │   │   similarity_service.py
+    │   │   similarity_service_additions.py
+    │   │
+    │   └───__pycache__
+    │           auth_service.cpython-311.pyc
+    │           case_service.cpython-311.pyc
+    │           feedback_service.cpython-311.pyc
+    │           image_service.cpython-311.pyc
+    │           log_service.cpython-311.pyc
+    │           ml_service.cpython-311.pyc
+    │           report_service.cpython-311.pyc
+    │           similarity_service.cpython-311.pyc
+    │
+    ├───utils
+    │   │   file_validator.py
+    │   │   image_processing.py
+    │   │   logger.py
+    │   │
+    │   └───__pycache__
+    │           logger.cpython-311.pyc
+    │
+    └───__pycache__
+            main.cpython-311.pyc
+├── 📁 ai_engine/ # AI & Research Layer
 │   ├── 📄 requirements.txt
 │   ├── 📄 config.py
 │   │
@@ -139,10 +234,10 @@ npm run dev
 │   │   │   │                         ├──Real/
 │   │   │   │                         └──Altered/
 │   │   │   └── toolmarks/
-│   │   │
-│   │   ├── 📁 processed/
-│   │   └── 📁 feedback_samples/         # Hard examples for retraining
-│   │
+│   │   ├──📁 processed/
+│   │   ├── 📁 processed_clean/
+│   │   └── 📁 feedback_samples/#Hard examples for
+│   │                            #retraining
 │   ├── 📁 preprocessing/
 │   │   ├── 📄 augment.py
 │   │   ├── 📄 enhance.py
@@ -152,16 +247,19 @@ npm run dev
 │   │   ├── 📄 cnn_feature_extractor.py
 │   │   ├── 📄 siamese_network.py
 │   │   ├── 📄 loss_functions.py
-│   │   ├── 📄 model_loader.py
-│   │   └── 📁 weights/                  # Ignored in git
+│   │   ├
+│   │   └── 📁 weights/ # Ignored in git
+│   │        ├───fingerprint
+│   │        │       └──best_model.pth
+│   │        └───toolmark #best_model of the tool mark
 │   │
 │   ├── 📁 training/
-│   │   ├── 📄 train.py
+│   │   ├── 📄 train_siamese.py
 │   │   ├── 📄 evaluate.py
 │   │   ├── 📄 metrics.py
-│   │   ├── 📄 retrain_from_feedback.py
+│   │   ├── 📄 siamese_dataset.py
 │   │   │
-│   │   └── 📁 experiments/              # Research  Experiments
+│   │   └── 📁 experiments/# Research Experiments
 │   │       ├── 📄 baseline_experiment.py
 │   │       ├── 📄 augmentation_experiment.py
 │   │       └── 📄 threshold_experiment.py
@@ -169,7 +267,8 @@ npm run dev
 │   └── 📁 inference/
 │       ├── 📄 preprocess.py
 │       ├── 📄 feature_extractor.py
-│       └── 📄 compare.py
+│       ├── 📄 compare.py
+│       └── inference.md
 │
 │
 ├── 📁 frontend/                         # Presentation Layer

@@ -21,7 +21,6 @@ Security rule
     Pydantic's model_config with from_attributes=True reads ORM objects
     but only exposes fields explicitly declared in the schema.
 """
-import hashlib
 from datetime import datetime
 from typing import Optional
 
@@ -46,7 +45,7 @@ class UserBase(BaseModel):
         examples=["abebe.girma@forensicedge.et"],
     )
     role: UserRole = Field(
-        default = UserRole.ANALYST,
+        default  = UserRole.ANALYST,
         examples = [UserRole.ANALYST],
     )
 
@@ -65,6 +64,18 @@ class UserCreate(UserBase):
         min_length = 8,
         max_length = 128,
         examples   = ["StrongPass123!"],
+    )
+
+    # Optional agency / identity fields supplied at registration (admin flow)
+    department:        Optional[str] = Field(None, max_length=100)
+    agency:            Optional[str] = Field(None, max_length=100)
+    rank:              Optional[str] = Field(None, max_length=50)
+    badge_number:      Optional[str] = Field(None, max_length=32)
+    clearance_level:   Optional[int] = Field(None, ge=1, le=5)
+    employment_status: Optional[str] = Field(
+        None,
+        pattern=r"^(ACTIVE|SUSPENDED|ON_LEAVE|TERMINATED|RETIRED|TRAINING)$",
+        examples=["ACTIVE"],
     )
 
     @field_validator("password")
@@ -95,6 +106,17 @@ class UserUpdate(BaseModel):
     is_active:  Optional[bool]     = None
     password:   Optional[str]      = Field(None, min_length=8, max_length=128)
 
+    # Agency / rank metadata
+    department:        Optional[str] = Field(None, max_length=100)
+    agency:            Optional[str] = Field(None, max_length=100)
+    rank:              Optional[str] = Field(None, max_length=50)
+    badge_number:      Optional[str] = Field(None, max_length=32)
+    clearance_level:   Optional[int] = Field(None, ge=1, le=5)
+    employment_status: Optional[str] = Field(
+        None,
+        pattern=r"^(ACTIVE|SUSPENDED|ON_LEAVE|TERMINATED|RETIRED|TRAINING)$",
+    )
+
 
 class LoginRequest(BaseModel):
     """Body for POST /api/v1/auth/login."""
@@ -106,17 +128,18 @@ class RefreshRequest(BaseModel):
     """Body for POST /api/v1/auth/refresh."""
     refresh_token: str = Field(..., description="JWT refresh token")
 
+
 class ChangePasswordRequest(BaseModel):
     """Body for POST /api/v1/auth/change-password."""
     current_password: str = Field(
         ...,
-        min_length = 1,
+        min_length  = 1,
         description = "The user's current password (or temporary password set by admin)",
     )
     new_password: str = Field(
         ...,
-        min_length = 8,
-        max_length = 128,
+        min_length  = 8,
+        max_length  = 128,
         description = "The new password to set",
     )
 
@@ -132,7 +155,6 @@ class ChangePasswordRequest(BaseModel):
         return v
 
 
-
 # ---------------------------------------------------------------------------
 # Response schemas
 # ---------------------------------------------------------------------------
@@ -140,17 +162,35 @@ class ChangePasswordRequest(BaseModel):
 class UserResponse(BaseModel):
     """
     User object returned to the client.
-    password_hash is deliberately excluded — never expose it.
+    Exposes the generated investigator_id for forensic tracking.
+    Includes agency / clearance metadata added in the expanded User model.
     """
-    id:         int
-    full_name:  str
-    email:      str
-    role:       UserRole
-    is_active:  bool
+    id:               int
+    investigator_id:  str
+    full_name:        str
+    email:            str
+    role:             UserRole
+    is_active:        bool
+
+    # Agency & rank metadata
+    department:        Optional[str] = None
+    agency:            Optional[str] = None
+    rank:              Optional[str] = None
+    badge_number:      Optional[str] = None
+    clearance_level:   int           = 1
+    employment_status: str           = "ACTIVE"
+
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserInDB(UserResponse):
+    """
+    Internal schema including sensitive fields for backend logic only.
+    """
+    password_hash: str
 
 
 class TokenResponse(BaseModel):
@@ -160,7 +200,7 @@ class TokenResponse(BaseModel):
     """
     access_token:  str
     refresh_token: str
-    token_type:    str        = "bearer"
+    token_type:    str = "bearer"
     user:          UserResponse
 
 
@@ -175,17 +215,21 @@ class AccessTokenResponse(BaseModel):
 
 class UserListResponse(BaseModel):
     """Paginated list of users for GET /admin/users."""
-    total:  int
-    page:   int
-    limit:  int
-    users:  list[UserResponse]
+    total: int
+    page:  int
+    limit: int
+    users: list[UserResponse]
 
 
 class UpdateMyProfileRequest(BaseModel):
-    full_name: Optional[str] = Field(
-        default=None,
-        min_length=2,
-        max_length=120,
-    )
-
-    email: Optional[EmailStr] = None
+    """
+    Body for PATCH /api/v1/users/me.
+    Users can update their own name, email, and agency metadata.
+    Role, clearance_level, and employment_status are admin-only.
+    """
+    full_name:    Optional[str]      = Field(None, min_length=2, max_length=120)
+    email:        Optional[EmailStr] = None
+    department:   Optional[str]      = Field(None, max_length=100)
+    agency:       Optional[str]      = Field(None, max_length=100)
+    rank:         Optional[str]      = Field(None, max_length=50)
+    badge_number: Optional[str]      = Field(None, max_length=32)
