@@ -59,8 +59,11 @@ two independent networks, not a Siamese network.
 
 Train / eval mode
 -----------------
-During training  : call model.train()  — Dropout active, BN uses batch stats.
-During inference : call model.eval()   — Dropout disabled, BN uses running stats.
+During training  : call model.train()  — Dropout active.
+During inference : call model.eval()   — Dropout disabled.
+
+GroupNorm behaves identically in train and eval mode because it does not
+track running statistics. Only Dropout changes behaviour between modes.
 The analyze() method enforces eval mode and torch.no_grad() automatically.
 Always restore training mode afterwards if needed (model.train()).
 
@@ -76,6 +79,7 @@ possible_threshold : similarity% for "POSSIBLE MATCH" verdict (default 55.0).
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numbers
 
 from ai_engine.models.cnn_toolmark_feature_extractor import ToolmarkCNN
 
@@ -240,7 +244,7 @@ class SiameseToolmarkNetwork(nn.Module):
         experiments/threshold_experiment.py after training — do not
         hardcode values here.
         """
-        if not isinstance(similarity, float):
+        if not isinstance(similarity, numbers.Real):
             raise TypeError(
                 f"match_status expects a Python float, got {type(similarity)}. "
                 f"Call .item() on a scalar tensor first."
@@ -284,7 +288,7 @@ class SiameseToolmarkNetwork(nn.Module):
             )
 
         # Switch to eval mode for consistent inference
-        # (disables Dropout, switches BatchNorm to running statistics)
+        # (disables Dropout; GroupNorm itself is mode-independent)
         was_training = self.training
         self.eval()
 

@@ -153,7 +153,11 @@ class ContrastiveLossToolmark(nn.Module):
             )
 
         # Euclidean distance between each embedding pair — shape: (B,)
-        distance = F.pairwise_distance(emb1, emb2, p=2)
+        distance = F.pairwise_distance(emb1,
+                                        emb2,
+                                        p=2,
+                                        eps=1e-6,
+                                         )
 
         # Same-pair term (label=1.0)
         # Pulls same-firearm embeddings toward distance = 0
