@@ -119,7 +119,7 @@ EVAL_THRESHOLD = 80.0
 # Number of positive pairs sampled per firearm label.
 # With 24 labels: 50 × 24 = 1,200 positive pairs + 1,200 negative pairs = 2,400 total.
 # Increasing to 100 gives 4,800 pairs — still fast, more statistically robust.
-PAIRS_PER_LABEL = 50
+PAIRS_PER_LABEL = 200
 
 SEED    = 42
 DEVICE  = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -292,37 +292,84 @@ def generate_pairs(
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 def run_inference(
     model: SiameseToolmarkNetwork,
     pairs: List[Tuple[Path, Path]],
+    batch_size: int = 64,
 ) -> np.ndarray:
     """
-    Run the model on all pairs and return similarity percentages.
+    Batched GPU inference for Siamese evaluation.
 
-    Images are loaded and normalised inline using load_image_tensor(),
-    which applies the same [0,255]→[−1,1] pipeline as SiameseToolmarkDataset.
-    No separate preprocess module is needed — toolmark test images are already
-    preprocessed PNGs from enhance_toolmark.py.
+    Why this is MUCH faster
+    -----------------------
+    Old version:
+        1 pair  -> GPU
+        1 pair  -> GPU
+        1 pair  -> GPU
 
-    Args:
-        model : trained SiameseToolmarkNetwork in eval() mode.
-        pairs : list of (Path, Path) tuples.
+    New version:
+        64 pairs -> GPU at once
+
+    This massively improves GPU utilisation and reduces:
+        - CUDA launch overhead
+        - CPU→GPU transfer overhead
+        - Python loop overhead
 
     Returns:
-        similarities : np.ndarray of shape (N,), values in [0.0, 100.0].
+        np.ndarray of similarity percentages in [0, 100].
     """
     similarities = []
 
+    model.eval()
+
     with torch.no_grad():
-        for path1, path2 in tqdm(pairs, desc="Evaluating pairs", unit="pair"):
-            t1 = load_image_tensor(path1).to(DEVICE)
-            t2 = load_image_tensor(path2).to(DEVICE)
 
-            emb1 = model.forward_once(t1)
-            emb2 = model.forward_once(t2)
+        for start_idx in tqdm(
+            range(0, len(pairs), batch_size),
+            desc="Evaluating batches",
+            unit="batch",
+        ):
 
-            sim = model.similarity_percentage(emb1, emb2).item()
-            similarities.append(sim)
+            batch_pairs = pairs[start_idx : start_idx + batch_size]
+
+            # ----------------------------------------------------------
+            # Load entire batch on CPU first
+            # ----------------------------------------------------------
+            batch1 = []
+            batch2 = []
+
+            for path1, path2 in batch_pairs:
+
+                img1 = load_image_tensor(path1).squeeze(0)
+                img2 = load_image_tensor(path2).squeeze(0)
+
+                batch1.append(img1)
+                batch2.append(img2)
+
+            # ----------------------------------------------------------
+            # Stack into tensors
+            # Shape:
+            #   (B, 1, H, W)
+            # ----------------------------------------------------------
+            batch1 = torch.stack(batch1).to(DEVICE, non_blocking=True)
+            batch2 = torch.stack(batch2).to(DEVICE, non_blocking=True)
+
+            # ----------------------------------------------------------
+            # Forward pass on FULL BATCH
+            # ----------------------------------------------------------
+            emb1 = model.forward_once(batch1)
+            emb2 = model.forward_once(batch2)
+
+            # ----------------------------------------------------------
+            # Vectorized similarity computation
+            # ----------------------------------------------------------
+            distances = F.pairwise_distance(emb1, emb2)
+
+            sims = (1.0 - distances / 2.0) * 100.0
+            sims = torch.clamp(sims, min=0.0, max=100.0)
+
+            similarities.extend(sims.cpu().numpy())
 
     return np.array(similarities, dtype=float)
 

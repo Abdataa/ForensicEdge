@@ -10,7 +10,7 @@ OUTPUT_DIR = Path("ai_engine/datasets/processed_clean")
 
 TARGET_SIZE = (224, 224)
 
-# Valid extensions — SOCOFing uses .BMP; lowercase comparison handles all cases
+ #Valid extensions — SOCOFing uses .BMP; lowercase comparison handles all cases
 VALID_EXTS = {".bmp", ".png", ".jpg", ".jpeg"}
 
 
