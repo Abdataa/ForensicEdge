@@ -56,6 +56,7 @@ import random
 from pathlib import Path
 
 import cv2
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 
@@ -215,15 +216,73 @@ class SiameseToolmarkDataset(Dataset):
             label = 1.0
 
         else:
-            # --- Negative pair: one image each from TWO DIFFERENT firearms ---
-            # Explicit id1 ≠ id2 check — critical with only 24 labels.
-            id1 = random.choice(self.label_names)
-            id2 = random.choice(self.label_names)
-            while id2 == id1:
-                id2 = random.choice(self.label_names)
+            # ------------------------------------------------------------------
+            # Semi-hard negative mining
+            # ------------------------------------------------------------------
+            # Instead of choosing a completely random different firearm,
+            # choose a VISUALLY SIMILAR different firearm.
+            #
+            # This creates informative forensic negatives:
+            #    - similar breech-face texture
+            #    - similar wear patterns
+            #    - same manufacturer characteristics
+            #
+            # Easy negatives teach almost nothing after early epochs.
+            # Semi-hard negatives improve discrimination boundaries.
+            # ------------------------------------------------------------------
 
+            # Anchor firearm
+            id1 = random.choice(self.label_names)
+
+            # Anchor image
             img1_path = random.choice(self.label_images[id1])
-            img2_path = random.choice(self.label_images[id2])
+
+            # Candidate negative labels (must be different firearm)
+            candidate_labels = [
+                lbl for lbl in self.label_names
+                if lbl != id1
+            ]
+
+            # Sample a small pool of candidate negatives
+            candidate_labels = random.sample(
+                candidate_labels,
+                min(10, len(candidate_labels))
+            )
+
+            best_distance = float("inf")
+            best_img2_path = None
+
+            # Load anchor image once
+            anchor_img = self.load_image(img1_path).numpy()
+
+            # --------------------------------------------------------------
+            # Find the MOST visually similar negative among candidates
+            # --------------------------------------------------------------
+            for neg_label in candidate_labels:
+
+                candidate_path = random.choice(
+                    self.label_images[neg_label]
+                )
+
+                candidate_img = self.load_image(
+                    candidate_path
+                ).numpy()
+
+                # ----------------------------------------------------------
+                # Lightweight visual similarity metric
+                #
+                # lower distance = more visually similar
+                # ----------------------------------------------------------
+                distance = np.mean(
+                    np.abs(anchor_img - candidate_img)
+                )
+
+                # Keep hardest/semi-hard candidate
+                if distance < best_distance:
+                    best_distance = distance
+                    best_img2_path = candidate_path
+
+            img2_path = best_img2_path
             label = 0.0
 
         img1 = self.load_image(img1_path)
