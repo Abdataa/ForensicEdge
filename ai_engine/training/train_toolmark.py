@@ -142,7 +142,7 @@ from ai_engine.models.loss_toolmark              import ContrastiveLossToolmark
 # Set True on the FIRST run to split the flat augmented/ and processed_clean/
 # folders into train / val / test subdirectories (80 / 10 / 10 split).
 # Set False on all subsequent runs — split is idempotent but takes time.
-RUN_SPLIT = True
+RUN_SPLIT = False
 
 # --- Data ---
 # Flat source directories (output of augment_toolmark.py / enhance_toolmark.py)
@@ -150,7 +150,7 @@ AUGMENTED_FLAT_DIR     = Path("ai_engine/datasets/toolmark/augmented")
 CLEAN_FLAT_DIR         = Path("ai_engine/datasets/toolmark/processed_clean")
 
 # Split target directories (created by split_toolmark_data() below)
-TRAIN_DIR = Path("ai_engine/datasets/toolmark/augmented/train")
+TRAIN_DIR = Path("ai_engine/datasets/toolmark/augmented")
 VAL_DIR   = Path("ai_engine/datasets/toolmark/split/val")
 
 # --- Model ---
